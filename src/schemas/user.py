@@ -1,5 +1,5 @@
 # src/schemas/user.py
-from typing import Optional, List, Annotated
+from typing import Any, Dict, Optional, List, Annotated
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 from pydantic.types import constr
@@ -66,3 +66,11 @@ class UserProfile(UserResponse):
 
     class Config:
         orm_mode = True
+
+# Schema per l'attività utente
+class UserActivityResponse(BaseModel):
+    """Schema per l'attività utente."""
+    viewed_patterns: List[Dict[str, Any]]
+    recent_searches: List[str]
+    contributions: List[Dict[str, Any]]
+    last_login: Optional[datetime] = None

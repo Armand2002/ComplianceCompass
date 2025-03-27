@@ -1,15 +1,19 @@
 # src/routes/auth_routes.py
-from fastapi import APIRouter, Depends, HTTPException, status
+import datetime
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from src.utils.jwt import create_access_token, verify_token
+from src.utils.password import get_password_hash
 from src.db.session import get_db
 from src.controllers.auth_controller import AuthController
 from src.middleware.auth_middleware import get_current_user
 from src.models.user_model import User
 from src.schemas.auth import UserRegister, Token, PasswordChange, PasswordReset, PasswordResetConfirm
 from src.schemas.user import UserResponse
-
+from src.utils.email import send_password_reset_email
+from src.utils.token import generate_verification_token, verify_verification_token
 # Crea il router
 router = APIRouter(
     prefix="/auth",
@@ -78,18 +82,65 @@ async def get_current_user_info(
     """
     return current_user
 
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    refresh_token: str = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    """
+    Ottiene un nuovo access token usando un refresh token.
+    """
+    token_data = verify_token(refresh_token)
+    
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token non valido o scaduto",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user_id = token_data.get("sub")
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utente non trovato o disattivato",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Genera nuovo access token
+    access_token = create_access_token(data={"sub": user.id})
+    
+    # Aggiorna l'ultimo accesso
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
 @router.post("/request-password-reset")
 async def request_password_reset(
-    reset_data: PasswordReset,
+    email_data: PasswordReset,
     db: Session = Depends(get_db)
 ):
     """
     Richiede un reset della password.
     
-    Invia un'email con un link per il reset (implementazione da completare).
+    Invia un'email con un link per il reset.
     """
-    # Questa è una funzione placeholder
-    # In una implementazione reale, genererai un token e invierai un'email
+    user = db.query(User).filter(User.email == email_data.email).first()
+    
+    if user:
+        # Genera token di verifica valido per 24 ore
+        token = generate_verification_token(user.id, expiration_hours=24)
+        
+        # Invia email con token
+        send_password_reset_email(user.email, user.username, token)
+    
+    # Nota: rispondiamo sempre positivamente per evitare enumeration di email
     return {"message": "Se l'email esiste, riceverai un link per il reset della password"}
 
 @router.post("/reset-password")
@@ -102,12 +153,32 @@ async def reset_password(
     
     Richiede il token ricevuto via email e la nuova password.
     """
-    # Questa è una funzione placeholder
-    # In una implementazione reale, verificherai il token e cambierai la password
     if reset_data.new_password != reset_data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Le password non corrispondono"
         )
+    
+    # Verifica token
+    user_id = verify_verification_token(reset_data.token)
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token non valido o scaduto"
+        )
+    
+    # Trova l'utente
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utente non trovato"
+        )
+    
+    # Aggiorna password
+    user.hashed_password = get_password_hash(reset_data.new_password)
+    db.commit()
     
     return {"message": "Password resettata con successo"}

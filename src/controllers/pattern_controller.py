@@ -325,3 +325,57 @@ class PatternController:
             "strategies": {s: c for s, c in strategy_counts},
             "mvc_components": {m: c for m, c in mvc_counts}
         }
+    
+@staticmethod
+def get_patterns_by_category(db: Session, category: str) -> List[PrivacyPattern]:
+    """
+    Recupera pattern per categoria.
+    
+    Args:
+        db (Session): Sessione database
+        category (str): Categoria da filtrare
+        
+    Returns:
+        List[PrivacyPattern]: Lista di pattern nella categoria
+    """
+    patterns = db.query(PrivacyPattern).filter(
+        PrivacyPattern.strategy == category
+    ).all()
+    
+    return patterns
+
+@staticmethod
+def get_related_patterns(db: Session, pattern: PrivacyPattern, limit: int = 5) -> List[PrivacyPattern]:
+    """
+    Trova pattern correlati a un pattern specifico.
+    
+    Args:
+        db (Session): Sessione database
+        pattern (PrivacyPattern): Pattern di riferimento
+        limit (int): Numero massimo di pattern da restituire
+        
+    Returns:
+        List[PrivacyPattern]: Lista di pattern correlati
+    """
+    # Raccogli gli ID degli articoli GDPR correlati
+    gdpr_ids = [article.id for article in pattern.gdpr_articles]
+    
+    # Cerca pattern che condividono articoli GDPR
+    query = db.query(PrivacyPattern).filter(
+        PrivacyPattern.id != pattern.id  # Escludi il pattern corrente
+    ).join(
+        PrivacyPattern.gdpr_articles
+    ).filter(
+        GDPRArticle.id.in_(gdpr_ids)
+    ).distinct()
+    
+    # Aggiungi pattern della stessa strategia
+    query_strategy = db.query(PrivacyPattern).filter(
+        PrivacyPattern.id != pattern.id,  # Escludi il pattern corrente
+        PrivacyPattern.strategy == pattern.strategy
+    )
+    
+    # Unisci i risultati e limita
+    related_patterns = query.union(query_strategy).limit(limit).all()
+    
+    return related_patterns

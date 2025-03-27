@@ -121,3 +121,50 @@ async def get_current_editor_user(current_user: User = Depends(get_current_user)
             detail="Accesso riservato agli editor"
         )
     return current_user
+
+async def check_permission(
+    current_user: User,
+    required_permission: str
+) -> bool:
+    """
+    Verifica se l'utente ha un permesso specifico.
+    
+    Args:
+        current_user (User): Utente corrente
+        required_permission (str): Permesso richiesto
+        
+    Returns:
+        bool: True se l'utente ha il permesso
+    """
+    # Permessi per ruolo (in una implementazione reale, questi sarebbero definiti nel database)
+    role_permissions = {
+        "admin": ["read", "write", "delete", "admin"],
+        "editor": ["read", "write", "delete"],
+        "viewer": ["read"]
+    }
+    
+    # Ottieni permessi in base al ruolo
+    user_role = current_user.role.value
+    user_permissions = role_permissions.get(user_role, [])
+    
+    return required_permission in user_permissions
+
+def permission_required(permission: str):
+    """
+    Decorator per richiedere un permesso specifico.
+    
+    Args:
+        permission (str): Permesso richiesto
+    """
+    async def permission_dependency(current_user: User = Depends(get_current_user)):
+        has_permission = await check_permission(current_user, permission)
+        
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permesso richiesto: {permission}"
+            )
+        
+        return current_user
+    
+    return Depends(permission_dependency)

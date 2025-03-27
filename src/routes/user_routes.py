@@ -1,13 +1,13 @@
 # src/routes/user_routes.py
-from typing import Optional, List
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from typing import Any, Dict, Optional, List
+from fastapi import APIRouter, Depends, File, Query, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from src.db.session import get_db
 from src.controllers.user_controller import UserController
 from src.models.user_model import User, UserRole
 from src.middleware.auth_middleware import get_current_user, get_current_admin_user
-from src.schemas.user import UserResponse, UserList, UserCreate, UserUpdate, UserProfile
+from src.schemas.user import UserResponse, UserList, UserCreate, UserUpdate, UserProfile, UserActivityResponse
 from src.schemas.auth import PasswordChange
 
 # Crea il router
@@ -188,3 +188,46 @@ async def change_password(
     )
     
     return {"message": "Password cambiata con successo"}
+
+@router.post("/preferences", response_model=UserResponse)
+async def update_user_preferences(
+    preferences: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Aggiorna le preferenze dell'utente corrente.
+    """
+    return UserController.update_user_preferences(
+        db=db,
+        user_id=current_user.id,
+        preferences=preferences
+    )
+
+@router.post("/avatar", response_model=UserResponse)
+async def update_user_avatar(
+    avatar_file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Aggiorna l'avatar dell'utente corrente.
+    """
+    return UserController.update_user_avatar(
+        db=db,
+        user_id=current_user.id,
+        avatar_file=avatar_file
+    )
+
+@router.get("/activity", response_model=UserActivityResponse)
+async def get_user_activity(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Restituisce l'attività recente dell'utente.
+    """
+    return UserController.get_user_activity(
+        db=db,
+        user_id=current_user.id
+    )

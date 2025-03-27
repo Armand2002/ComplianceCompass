@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.db.session import get_db
 from src.controllers.pattern_controller import PatternController
 from src.models.user_model import User
-from src.middleware.auth_middleware import get_current_user, get_current_editor_user, get_current_admin_user
+from src.middleware.auth_middleware import get_current_user, get_current_editor_user, get_current_admin_user, permission_required
 from src.schemas.privacy_pattern import (
     PatternCreate, 
     PatternUpdate, 
@@ -168,3 +168,93 @@ async def get_patterns_by_mvc(
     )
     
     return result["patterns"]
+
+@router.get("/by-category", response_model=List[PatternResponse])
+async def get_patterns_by_category(
+    category: str = Query(..., description="Categoria di pattern"),
+    db: Session = Depends(get_db)
+):
+    """
+    Recupera tutti i pattern in una specifica categoria.
+    
+    Utile per visualizzazioni organizzate per categoria.
+    """
+    result = PatternController.get_patterns_by_category(
+        db=db,
+        category=category
+    )
+    
+    return result
+
+@router.get("/related/{pattern_id}", response_model=List[PatternResponse])
+async def get_related_patterns(
+    pattern_id: int,
+    limit: int = Query(5, ge=1, le=20, description="Numero massimo di pattern correlati"),
+    db: Session = Depends(get_db)
+):
+    """
+    Recupera pattern correlati al pattern specificato.
+    
+    La correlazione è basata su tag, categorie e relazioni GDPR comuni.
+    """
+    pattern = PatternController.get_pattern(db=db, pattern_id=pattern_id)
+    
+    if not pattern:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pattern con ID {pattern_id} non trovato"
+        )
+    
+    related = PatternController.get_related_patterns(
+        db=db,
+        pattern=pattern,
+        limit=limit
+    )
+    
+    return related
+
+@router.post("/", response_model=PatternResponse, status_code=status.HTTP_201_CREATED)
+async def create_pattern(
+    pattern: PatternCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(permission_required("write"))
+):
+    """
+    Crea un nuovo privacy pattern.
+    
+    Richiede permesso di scrittura.
+    """
+    return PatternController.create_pattern(db=db, pattern=pattern, current_user=current_user)
+
+@router.put("/{pattern_id}", response_model=PatternResponse)
+async def update_pattern(
+    pattern_id: int,
+    pattern: PatternUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(permission_required("write"))
+):
+    """
+    Aggiorna un privacy pattern esistente.
+    
+    Richiede permesso di scrittura.
+    """
+    return PatternController.update_pattern(
+        db=db, 
+        pattern_id=pattern_id, 
+        pattern_update=pattern, 
+        current_user=current_user
+    )
+
+@router.delete("/{pattern_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pattern(
+    pattern_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(permission_required("delete"))
+):
+    """
+    Elimina un privacy pattern.
+    
+    Richiede permesso di eliminazione.
+    """
+    PatternController.delete_pattern(db=db, pattern_id=pattern_id, current_user=current_user)
+    return None

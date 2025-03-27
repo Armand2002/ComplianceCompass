@@ -3,6 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
+from ComplianceCompass.src.controllers.pattern_controller import PatternController
 from src.db.session import get_db
 from src.services.search_service import SearchService
 from src.controllers.search_controller import SearchController
@@ -149,3 +150,37 @@ async def reindex_patterns(db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore durante la reindicizzazione"
         )
+    
+@router.get("/autocomplete")
+async def autocomplete(
+    q: str = Query(..., min_length=2, description="Query di ricerca"),
+    limit: int = Query(10, ge=1, le=20, description="Numero massimo di suggerimenti"),
+    db: Session = Depends(get_db)
+):
+    """
+    Fornisce suggerimenti di autocompletamento basati sulla query.
+    """
+    controller = SearchController()
+    suggestions = controller.get_autocomplete_suggestions(
+        db=db,
+        query=q,
+        limit=limit
+    )
+    
+    return {"suggestions": suggestions}
+
+@router.get("/trending")
+async def trending_patterns(
+    limit: int = Query(5, ge=1, le=20, description="Numero di pattern da restituire"),
+    db: Session = Depends(get_db)
+):
+    """
+    Restituisce i pattern più visualizzati o popolari.
+    """
+    controller = PatternController()
+    patterns = controller.get_trending_patterns(
+        db=db,
+        limit=limit
+    )
+    
+    return {"patterns": patterns}

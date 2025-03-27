@@ -2,9 +2,13 @@
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+import logging
 
 from src.services.search_service import SearchService
 from src.models.privacy_pattern import PrivacyPattern
+
+# Crea un logger per questo modulo
+logger = logging.getLogger(__name__)
 
 class SearchController:
     """
@@ -146,3 +150,65 @@ class SearchController:
             return False
         
         return self.search_service.reindex_all_patterns(db)
+    
+    def get_autocomplete_suggestions(
+        self, 
+        db: Session,
+        query: str,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Genera suggerimenti di autocompletamento.
+        
+        Args:
+            db (Session): Sessione database
+            query (str): Query parziale
+            limit (int): Numero massimo di suggerimenti
+            
+        Returns:
+            List[Dict[str, Any]]: Lista di suggerimenti
+        """
+        # Se Elasticsearch è disponibile
+        if self.search_service.es:
+            try:
+                # Usa Elasticsearch per suggerimenti
+                body = {
+                    "size": 0,
+                    "suggest": {
+                        "pattern_suggest": {
+                            "prefix": query,
+                            "completion": {
+                                "field": "title.completion",
+                                "size": limit
+                            }
+                        }
+                    }
+                }
+                
+                response = self.search_service.es.search(
+                    index=self.search_service.index_name,
+                    body=body
+                )
+                
+                suggestions = []
+                for option in response["suggest"]["pattern_suggest"][0]["options"]:
+                    suggestions.append({
+                        "id": option["_source"]["id"],
+                        "title": option["_source"]["title"],
+                        "text": option["text"]
+                    })
+                
+                return suggestions
+            except Exception as e:
+                logger.error(f"Errore in autocomplete con Elasticsearch: {str(e)}")
+        
+        # Fallback: ricerca nel database
+        search_term = f"%{query}%"
+        patterns = db.query(PrivacyPattern).filter(
+            PrivacyPattern.title.ilike(search_term)
+        ).limit(limit).all()
+        
+        return [
+            {"id": p.id, "title": p.title, "text": p.title} 
+            for p in patterns
+        ]
