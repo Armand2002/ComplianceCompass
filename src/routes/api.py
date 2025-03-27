@@ -1,7 +1,7 @@
 # src/routes/api.py
 from fastapi import APIRouter
 
-from src.routes import auth_routes, pattern_routes, user_routes, search_routes, notification_routes
+from src.routes import auth_routes, pattern_routes, user_routes, search_routes, notification_routes, chatbot_routes
 
 # Crea il router API principale
 api_router = APIRouter(prefix="/api")
@@ -12,6 +12,7 @@ api_router.include_router(pattern_routes.router)
 api_router.include_router(user_routes.router)
 api_router.include_router(search_routes.router)
 api_router.include_router(notification_routes.router)
+api_router.include_router(chatbot_routes.router)
 
 @api_router.get("/health")
 async def health_check():

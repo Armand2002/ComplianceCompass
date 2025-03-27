@@ -9,6 +9,8 @@ from datetime import datetime
 from src.config import settings
 from src.routes.api import api_router
 from src.db.init_db import init_db
+from src.services.elasticsearch_init import ElasticsearchInit
+from src.middleware.error_handler import register_exception_handlers
 
 # Configurazione logger
 logging.basicConfig(
@@ -53,18 +55,8 @@ async def log_requests(request: Request, call_next):
     
     return response
 
-# Handler globale errori
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """
-    Handler globale per eccezioni non gestite.
-    """
-    logger.error(f"Eccezione non gestita: {str(exc)}", exc_info=True)
-    
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Si è verificato un errore interno."}
-    )
+# Registra gli handler per le eccezioni
+register_exception_handlers(app)
 
 # Includi router API
 app.include_router(api_router)
@@ -95,6 +87,18 @@ async def startup_event():
     
     # Inizializza database
     init_db()
+    
+    # Inizializza Elasticsearch
+    try:
+        es_init = ElasticsearchInit()
+        if es_init.connected:
+            # Setup indici Elasticsearch
+            es_init.setup_indices()
+            logger.info("Elasticsearch inizializzato con successo.")
+        else:
+            logger.warning("Elasticsearch non disponibile. Funzionalità di ricerca avanzata disabilitate.")
+    except Exception as e:
+        logger.error(f"Errore nell'inizializzazione di Elasticsearch: {str(e)}")
     
     logger.info("Applicazione avviata con successo")
 
