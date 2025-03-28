@@ -1,28 +1,58 @@
-# docker/Dockerfile.api
-FROM python:3.11-slim
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Imposta variabili d'ambiente
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    ENVIRONMENT=production
-
-# Installa le dipendenze di sistema
+# Installa le dipendenze di sistema per la compilazione
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia requirements e installa dipendenze Python
+# Copia e installa le dipendenze Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Crea un utente non-root
+RUN useradd --create-home appuser && chown -R appuser:appuser /app
+# Imposta variabili d'ambiente
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ENVIRONMENT=production
+
+# Installa le dipendenze di sistema per il runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copia le wheel dal builder
+COPY --from=builder /app/wheels /wheels
+RUN pip install --no-cache /wheels/*
 
 # Copia il codice dell'applicazione
-COPY . .
+COPY --chown=appuser:appuser alembic/ /app/alembic/
+COPY --chown=appuser:appuser scripts/ /app/scripts/
+COPY --chown=appuser:appuser src/ /app/src/
+COPY --chown=appuser:appuser alembic.ini /app/
+
+# Cartella per i dati persistenti
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+
+# Cambia all'utente non-root
+USER appuser
 
 # Esponi la porta
 EXPOSE 8000
 
-# Comando di avvio
+# Script di entrypoint per migrazioni e avvio
+COPY --chown=appuser:appuser docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
