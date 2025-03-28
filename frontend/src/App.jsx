@@ -35,11 +35,11 @@ const App = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            
+            <Route path="/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} /> {/* Dashboard pubblica */}
+
             {/* Rotte protette con layout principale */}
             <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
               <Route path="patterns" element={<PatternListPage />} />
               <Route path="patterns/:id" element={<PatternDetailPage />} />
               <Route path="patterns/create" element={<PatternCreatePage />} />
