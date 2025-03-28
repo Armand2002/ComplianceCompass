@@ -1,3 +1,6 @@
+@import './pages/aboutPage.scss';
+@import './pages/homepage.scss';
+
 /* Variables */
 :root {
   /* Colori principali */
@@ -625,7 +628,7 @@ button {
   margin-top: var(--spacing-xl);
   
   p {
-    color: var (--text-secondary);
+    color: var(--text-secondary);
     
     a {
       font-weight: 500;
@@ -1275,3 +1278,4 @@ button {
 .mb-5 { margin-bottom: var(--spacing-xxl); }
 
 .mx-auto { margin-left: auto; margin-right: auto; }
+

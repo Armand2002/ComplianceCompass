@@ -10,6 +10,7 @@ import MainLayout from './components/layout/MainLayout';
 import LoginPage from './pages/auth/Login';
 import RegisterPage from './pages/auth/Register';
 import ForgotPasswordPage from './pages/auth/ForgotPassword';
+import HomePage from './pages/Homepage'; // Assicurati che questo import sia presente
 import DashboardPage from './pages/dashboard/Dashboard';
 import PatternListPage from './pages/patterns/PatternList';
 import PatternDetailPage from './pages/patterns/PatternDetail';
@@ -19,6 +20,7 @@ import SearchPage from './pages/search/SearchPage';
 import ChatbotPage from './pages/chatbot/ChatbotPage';
 import UserProfilePage from './pages/profile/UserProfile';
 import NotFoundPage from './pages/NotFound';
+import AboutPage from './pages/AboutPage';
 
 // Componente per le rotte protette
 import ProtectedRoute from './utils/ProtectedRoute';
@@ -35,18 +37,23 @@ const App = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/dashboard" element={<MainLayout><DashboardPage /></MainLayout>} /> {/* Dashboard pubblica */}
-
+            
+            {/* Layout pubblico */}
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+            
             {/* Rotte protette con layout principale */}
-            <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="patterns" element={<PatternListPage />} />
-              <Route path="patterns/:id" element={<PatternDetailPage />} />
-              <Route path="patterns/create" element={<PatternCreatePage />} />
-              <Route path="patterns/:id/edit" element={<PatternEditPage />} />
-              <Route path="search" element={<SearchPage />} />
-              <Route path="chatbot" element={<ChatbotPage />} />
-              <Route path="profile" element={<UserProfilePage />} />
+            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+              <Route path="/patterns" element={<PatternListPage />} />
+              <Route path="/patterns/:id" element={<PatternDetailPage />} />
+              <Route path="/patterns/create" element={<PatternCreatePage />} />
+              <Route path="/patterns/:id/edit" element={<PatternEditPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/chatbot" element={<ChatbotPage />} />
+              <Route path="/profile" element={<UserProfilePage />} />
             </Route>
             
             {/* Pagina 404 */}

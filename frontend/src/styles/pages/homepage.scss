@@ -1,0 +1,101 @@
+.homepage-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+}
+
+.hero-section {
+  text-align: center;
+  padding: var(--spacing-xxl) var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  border-radius: var(--border-radius-lg);
+  background-color: var(--primary-color);
+  color: white;
+  
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: var(--spacing-lg);
+    font-weight: 700;
+  }
+  
+  p {
+    font-size: var(--font-size-lg);
+    max-width: 700px;
+    margin: 0 auto var(--spacing-xl);
+  }
+}
+
+.search-form {
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+  gap: var(--spacing-md);
+}
+
+.search-box {
+  flex: 1;
+  position: relative;
+  
+  .search-icon {
+    position: absolute;
+    left: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+  }
+  
+  .search-input {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) * 2 + 16px);
+    border-radius: var(--border-radius-md);
+    border: none;
+    font-size: var(--font-size-md);
+    
+    &:focus {
+      outline: none;
+    }
+  }
+}
+
+.features-section {
+  margin: var(--spacing-xxl) 0;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.feature-box {
+  background-color: var(--card-background);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  box-shadow: var(--box-shadow);
+  transition: transform var(--transition-speed) var(--transition-function), 
+              box-shadow var(--transition-speed) var(--transition-function);
+  
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--box-shadow-hover);
+  }
+  
+  .feature-icon {
+    color: var(--primary-color);
+    font-size: 24px;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  h3 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-color);
+  }
+  
+  p {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* Aggiungi qui gli stili per le altre sezioni */
