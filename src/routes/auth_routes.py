@@ -14,6 +14,7 @@ from src.schemas.auth import UserRegister, Token, PasswordChange, PasswordReset,
 from src.schemas.user import UserResponse
 from src.utils.email import send_password_reset_email
 from src.utils.token import generate_verification_token, verify_verification_token
+
 # Crea il router
 router = APIRouter(
     prefix="/auth",

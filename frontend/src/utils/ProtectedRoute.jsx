@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 /**
  * Componente per le rotte protette
  * Reindirizza al login se l'utente non è autenticato
  */
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useContext(AuthContext);
   const location = useLocation();
 
@@ -26,8 +26,8 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Renderizza i children se l'utente è autenticato
-  return children;
+  // Renderizza le route figlie tramite Outlet
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

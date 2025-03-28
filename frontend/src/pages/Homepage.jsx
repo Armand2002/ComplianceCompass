@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaShieldAlt, FaBook, FaUsers, FaLightbulb, FaSearch, FaRobot, FaDatabase, FaCode } from 'react-icons/fa';
+import { FaShieldAlt, FaBook, FaSearch, FaRobot, FaDatabase, FaCode, FaLightbulb } from 'react-icons/fa';
 
 const HomePage = () => {
   const [recentPatterns, setRecentPatterns] = useState([]);
@@ -15,7 +15,7 @@ const HomePage = () => {
       setError(null);
       
       try {
-        // Mock data for demo
+        // Mock data per dimostrazione
         setRecentPatterns([
           {
             id: 1,
@@ -74,9 +74,9 @@ const HomePage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="w-12 h-12 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-        <p className="ml-4">Caricamento...</p>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Caricamento...</p>
       </div>
     );
   }
@@ -143,127 +143,107 @@ const HomePage = () => {
       </div>
       
       {/* Recent Patterns Section */}
-      <div className="my-12">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Pattern Recenti</h2>
-          <a href="/patterns" className="text-blue-600 hover:underline">Visualizza tutti</a>
+      <div className="recent-patterns-section">
+        <div className="section-header">
+          <h2>Pattern Recenti</h2>
+          <Link to="/patterns" className="section-link">Visualizza tutti</Link>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="pattern-cards-grid">
           {recentPatterns.length > 0 ? (
             recentPatterns.map(pattern => (
-              <div key={pattern.id} className="bg-white shadow-md rounded-lg overflow-hidden">
-                <div className="p-6">
-                  <div className="flex gap-2 mb-3">
-                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+              <div key={pattern.id} className="pattern-card">
+                <div className="pattern-card-header">
+                  <div className="pattern-card-badges">
+                    <span className={`strategy-badge ${pattern.strategy.toLowerCase()}`}>
                       {pattern.strategy}
                     </span>
-                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                    <span className="mvc-badge">
                       {pattern.mvc_component}
                     </span>
                   </div>
                   
-                  <h3 className="text-lg font-semibold mb-2">
-                    <a href={`/patterns/${pattern.id}`} className="hover:text-blue-600">
+                  <h3 className="pattern-card-title">
+                    <Link to={`/patterns/${pattern.id}`}>
                       {pattern.title}
-                    </a>
+                    </Link>
                   </h3>
-                  
-                  <p className="text-gray-600 text-sm mb-4">
+                </div>
+                
+                <div className="pattern-card-content">
+                  <p className="pattern-card-description">
                     {pattern.description.length > 150 
                       ? `${pattern.description.substring(0, 150)}...` 
                       : pattern.description
                     }
                   </p>
-                  
-                  <a href={`/patterns/${pattern.id}`} className="text-blue-600 hover:underline text-sm">
-                    Dettagli →
-                  </a>
+                </div>
+                
+                <div className="pattern-card-footer">
+                  <Link to={`/patterns/${pattern.id}`} className="card-link">
+                    Dettagli
+                  </Link>
                 </div>
               </div>
             ))
           ) : (
-            <div className="col-span-3 text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">Nessun pattern disponibile.</p>
+            <div className="empty-state">
+              <p>Nessun pattern disponibile.</p>
             </div>
           )}
         </div>
       </div>
       
       {/* Quick Stats Section */}
-      <div className="my-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white shadow-md rounded-lg p-6 flex items-center">
-            <div className="bg-blue-100 p-4 rounded-full mr-4">
+      <div className="stats-section">
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">
               <FaShieldAlt />
             </div>
-            <div>
-              <h3 className="text-gray-500 text-sm">Pattern Totali</h3>
-              <p className="text-3xl font-bold">{statsData?.total || 0}</p>
+            <div className="stat-content">
+              <h3>Pattern Totali</h3>
+              <p className="stat-value">{statsData?.total || 0}</p>
             </div>
           </div>
           
-          <div className="bg-white shadow-md rounded-lg p-6 flex items-center">
-            <div className="bg-blue-100 p-4 rounded-full mr-4">
+          <div className="stat-card">
+            <div className="stat-icon">
               <FaDatabase />
             </div>
-            <div>
-              <h3 className="text-gray-500 text-sm">Articoli GDPR</h3>
-              <p className="text-3xl font-bold">99</p>
+            <div className="stat-content">
+              <h3>Articoli GDPR</h3>
+              <p className="stat-value">99</p>
             </div>
           </div>
           
-          <div className="bg-white shadow-md rounded-lg p-6 flex items-center">
-            <div className="bg-blue-100 p-4 rounded-full mr-4">
+          <div className="stat-card">
+            <div className="stat-icon">
               <FaCode />
             </div>
-            <div>
-              <h3 className="text-gray-500 text-sm">Strategie</h3>
-              <p className="text-3xl font-bold">{statsData?.strategies ? Object.keys(statsData.strategies).length : 0}</p>
+            <div className="stat-content">
+              <h3>Strategie</h3>
+              <p className="stat-value">{statsData?.strategies ? Object.keys(statsData.strategies).length : 0}</p>
             </div>
           </div>
           
-          <div className="bg-white shadow-md rounded-lg p-6 flex items-center">
-            <div className="bg-blue-100 p-4 rounded-full mr-4">
+          <div className="stat-card">
+            <div className="stat-icon">
               <FaLightbulb />
             </div>
-            <div>
-              <h3 className="text-gray-500 text-sm">Vulnerabilità</h3>
-              <p className="text-3xl font-bold">15</p>
+            <div className="stat-content">
+              <h3>Vulnerabilità</h3>
+              <p className="stat-value">15</p>
             </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* About Section */}
-      <div className="my-12 bg-gray-50 rounded-lg p-8">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold mb-4">Informazioni su Compliance Compass</h2>
-          <p className="mb-4">
-            Compliance Compass è una piattaforma wiki collaborativa progettata per semplificare 
-            la comprensione delle normative tecniche e di sicurezza. Il nostro obiettivo è fornire 
-            ai professionisti dell'informatica, agli sviluppatori e ai responsabili della privacy 
-            uno strumento completo per navigare nel complesso panorama della conformità 
-            alla privacy e alla sicurezza.
-          </p>
-          <p className="mb-6">
-            La piattaforma offre una vasta collezione di Privacy Pattern, un'esplorazione 
-            dettagliata del GDPR, e strumenti intelligenti come ricerca avanzata e un assistente 
-            basato su AI per aiutarti a trovare rapidamente le informazioni di cui hai bisogno.
-          </p>
-          
-          <div className="flex gap-4">
-            <a href="/patterns" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg">Esplora i Pattern</a>
-            <a href="/about" className="bg-white hover:bg-gray-100 text-blue-600 border border-blue-600 py-2 px-6 rounded-lg">Scopri di più</a>
           </div>
         </div>
       </div>
       
       {/* Call to Action Section */}
-      <div className="my-12 bg-blue-700 text-white text-center py-12 px-4 rounded-lg">
-        <h2 className="text-3xl font-bold mb-2">Inizia a Esplorare</h2>
-        <p className="text-xl mb-6">Scopri come i Privacy Pattern possono aiutarti a proteggere i dati dei tuoi utenti</p>
-        <a href="/patterns" className="bg-white text-blue-700 hover:bg-gray-100 py-3 px-8 rounded-lg font-bold">Esplora Ora</a>
+      <div className="cta-section">
+        <h2>Inizia a Esplorare</h2>
+        <p>Scopri come i Privacy Pattern possono aiutarti a proteggere i dati dei tuoi utenti</p>
+        <Link to="/patterns" className="button primary">Esplora Ora</Link>
       </div>
     </div>
   );
