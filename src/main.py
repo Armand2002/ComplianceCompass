@@ -9,11 +9,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
 from src.routes.api import api_router
 from src.db.init_db import init_db
 from src.services.elasticsearch_init import ElasticsearchInit
 from src.middleware.error_handler import register_exception_handlers
+from starlette.middleware import CSRFMiddleware
 
 # Configurazione logger
 logging.basicConfig(
@@ -43,6 +45,19 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
+)
+
+# In src/main.py - Verificare che il middleware sia correttamente applicato
+app.add_middleware(
+    RateLimitMiddleware,
+    limit=settings.RATE_LIMIT_DEFAULT,
+    interval=60
+)
+
+app.add_middleware(
+    CSRFMiddleware,
+    secret=settings.SECRET_KEY,
+    safe_methods=["GET", "HEAD", "OPTIONS"]
 )
 
 # Middleware per logging delle richieste

@@ -2,6 +2,7 @@
 from functools import wraps
 import time
 from typing import Dict, Any, Callable, Optional
+import threading
 
 # Singleton cache globale
 _cache_instance = None
@@ -26,6 +27,7 @@ class SimpleCache:
         """
         self.cache: Dict[str, Dict[str, Any]] = {}
         self.default_ttl = default_ttl
+        self._lock = threading.RLock()  # Per thread safety
     
     def get(self, key: str) -> Optional[Any]:
         """
