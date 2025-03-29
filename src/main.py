@@ -5,6 +5,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from datetime import datetime
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.config import settings
 from src.routes.api import api_router
@@ -19,6 +22,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configurazione rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Crea applicazione FastAPI
 app = FastAPI(
     title=settings.APP_NAME,
@@ -27,14 +33,16 @@ app = FastAPI(
     docs_url="/api/docs" if not settings.ENVIRONMENT == "production" else None,
     redoc_url="/api/redoc" if not settings.ENVIRONMENT == "production" else None,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configura CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Middleware per logging delle richieste

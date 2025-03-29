@@ -125,12 +125,11 @@ async def update_pattern(
 async def delete_pattern(
     pattern_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(permission_required("delete"))
 ):
     """
     Elimina un privacy pattern.
-    
-    Gli admin possono eliminare qualsiasi pattern, gli editor solo quelli creati da loro.
+    Richiede permesso di eliminazione.
     """
     PatternController.delete_pattern(db=db, pattern_id=pattern_id, current_user=current_user)
     return None
@@ -212,49 +211,3 @@ async def get_related_patterns(
     )
     
     return related
-
-@router.post("/", response_model=PatternResponse, status_code=status.HTTP_201_CREATED)
-async def create_pattern(
-    pattern: PatternCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(permission_required("write"))
-):
-    """
-    Crea un nuovo privacy pattern.
-    
-    Richiede permesso di scrittura.
-    """
-    return PatternController.create_pattern(db=db, pattern=pattern, current_user=current_user)
-
-@router.put("/{pattern_id}", response_model=PatternResponse)
-async def update_pattern(
-    pattern_id: int,
-    pattern: PatternUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(permission_required("write"))
-):
-    """
-    Aggiorna un privacy pattern esistente.
-    
-    Richiede permesso di scrittura.
-    """
-    return PatternController.update_pattern(
-        db=db, 
-        pattern_id=pattern_id, 
-        pattern_update=pattern, 
-        current_user=current_user
-    )
-
-@router.delete("/{pattern_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_pattern(
-    pattern_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(permission_required("delete"))
-):
-    """
-    Elimina un privacy pattern.
-    
-    Richiede permesso di eliminazione.
-    """
-    PatternController.delete_pattern(db=db, pattern_id=pattern_id, current_user=current_user)
-    return None

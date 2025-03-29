@@ -346,6 +346,12 @@ class SearchService:
                 "total": total,
                 "results": results
             }
+        except exceptions.ConnectionError as e:
+            logger.error(f"Errore di connessione a Elasticsearch: {str(e)}")
+            return {"total": 0, "results": [], "error": "connection_error"}
+        except exceptions.NotFoundError as e:
+            logger.error(f"Indice non trovato in Elasticsearch: {str(e)}")
+            return {"total": 0, "results": [], "error": "index_not_found"}
         except Exception as e:
-            logger.error(f"Errore nella ricerca: {str(e)}")
-            return {"total": 0, "results": []}
+            logger.error(f"Errore imprevisto nella ricerca Elasticsearch: {str(e)}")
+            return {"total": 0, "results": [], "error": "general_error"}

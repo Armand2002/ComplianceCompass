@@ -18,12 +18,10 @@ class UserBase(BaseModel):
     full_name: Optional[str] = Field(None, max_length=100, description="Nome completo dell'utente")
     bio: Optional[str] = Field(None, description="Biografia dell'utente")
     avatar_url: Optional[str] = Field(None, description="URL dell'avatar dell'utente")
-    avatar_url: Optional[str] = Field(None, description="URL dell'avatar dell'utente")
 
 class UserCreate(UserBase):
     """Schema per la creazione di un nuovo utente."""
     password: str = Field(..., min_length=8, description="Password dell'utente")
-    role: UserRole = Field(default=UserRole.VIEWER, description="Ruolo dell'utente")
     role: UserRole = Field(default=UserRole.VIEWER, description="Ruolo dell'utente")
 
 class UserUpdate(BaseModel):
@@ -31,7 +29,6 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     full_name: Optional[str] = Field(None, max_length=100)
-    full_name: Optional[Annotated[str, constr(max_length=100)]] = None
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
     role: Optional[UserRole] = None

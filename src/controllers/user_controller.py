@@ -2,12 +2,15 @@
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
+import os
+import time
 
 from src.models.user_model import User, UserRole
 from src.models.privacy_pattern import PrivacyPattern
 from src.utils.password import get_password_hash, verify_password
 from src.schemas.user import UserCreate, UserUpdate
+from src.config import settings
 
 class UserController:
     """
@@ -326,3 +329,64 @@ class UserController:
         db.commit()
         
         return True
+    
+    @staticmethod
+    def update_user_avatar(db: Session, user_id: int, avatar_file: UploadFile) -> User:
+        """
+        Aggiorna l'avatar di un utente.
+        
+        Args:
+            db (Session): Sessione database
+            user_id (int): ID dell'utente
+            avatar_file (UploadFile): File dell'avatar
+            
+        Returns:
+            User: Utente aggiornato con nuovo avatar
+            
+        Raises:
+            HTTPException: Se il file non è un'immagine o supera la dimensione massima
+        """
+        # Validazione del file
+        if not avatar_file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Il file deve essere un'immagine"
+            )
+        
+        # Limitazione dimensione file
+        MAX_SIZE = 2 * 1024 * 1024  # 2MB
+        file_size = 0
+        file_content = b""
+        
+        for chunk in avatar_file.file:
+            file_size += len(chunk)
+            if file_size > MAX_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Dimensione massima consentita: {MAX_SIZE // (1024 * 1024)}MB"
+                )
+            file_content += chunk
+        
+        # Generazione nome file sicuro
+        filename = f"avatar_{user_id}_{int(time.time())}.jpg"
+        
+        # Salvataggio file
+        avatar_path = os.path.join(settings.MEDIA_ROOT, "avatars", filename)
+        os.makedirs(os.path.dirname(avatar_path), exist_ok=True)
+        
+        with open(avatar_path, "wb") as f:
+            f.write(file_content)
+        
+        # Aggiornamento utente
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Utente con ID {user_id} non trovato"
+            )
+        
+        user.avatar_url = f"{settings.MEDIA_URL}avatars/{filename}"
+        db.commit()
+        db.refresh(user)
+        
+        return user

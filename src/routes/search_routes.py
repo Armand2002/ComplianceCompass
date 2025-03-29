@@ -3,7 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ComplianceCompass.src.controllers.pattern_controller import PatternController
+from src.controllers.pattern_controller import PatternController
 from src.db.session import get_db
 from src.services.search_service import SearchService
 from src.controllers.search_controller import SearchController

@@ -1,7 +1,8 @@
 # src/config.py
 import os
 from dotenv import load_dotenv
-from pydantic import BaseSettings
+from pydantic import BaseSettings, Field
+from typing import List
 
 # Carica variabili d'ambiente dal file .env
 load_dotenv()
@@ -32,13 +33,18 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
-    # CORS
-    CORS_ORIGINS: list = [
-        "http://localhost",
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "https://compliance-compass.example.com"
-    ]
+    # CORS settings
+    CORS_ORIGINS: List[str] = Field(
+        ["http://localhost:3000", "https://app.compliancecompass.example"],
+        description="Lista di origini consentite per CORS"
+    )
+    
+    # Media settings
+    MEDIA_ROOT: str = Field("./media", description="Directory per i file caricati")
+    MEDIA_URL: str = Field("/media/", description="URL base per i file")
+    
+    # Rate limiting
+    RATE_LIMIT_DEFAULT: int = Field(100, description="Limite richieste per minuto")
     
     # Elasticsearch
     ELASTICSEARCH_URL: str = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")

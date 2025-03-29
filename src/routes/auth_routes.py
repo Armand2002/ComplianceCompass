@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from src.utils.jwt import create_access_token, verify_token
+from src.utils.jwt import create_access_token, create_refresh_token, verify_token
 from src.utils.password import get_password_hash
 from src.db.session import get_db
 from src.controllers.auth_controller import AuthController
@@ -89,36 +89,42 @@ async def refresh_token(
     db: Session = Depends(get_db)
 ):
     """
-    Ottiene un nuovo access token usando un refresh token.
+    Rinnova un token di accesso usando un refresh token.
     """
-    token_data = verify_token(refresh_token)
-    
-    if not token_data:
+    # Verifica il refresh token
+    payload = verify_token(refresh_token)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token non valido o scaduto",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Token di refresh non valido o scaduto"
         )
     
-    user_id = token_data.get("sub")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido"
+        )
+    
+    # Ottieni l'utente
     user = db.query(User).filter(User.id == user_id).first()
-    
-    if not user or not user.is_active:
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Utente non trovato o disattivato",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Utente non trovato"
         )
     
-    # Genera nuovo access token
+    # Crea nuovi token
     access_token = create_access_token(data={"sub": user.id})
+    new_refresh_token = create_refresh_token(data={"sub": user.id})
     
     # Aggiorna l'ultimo accesso
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.datetime.utcnow()
     db.commit()
     
     return {
         "access_token": access_token,
+        "refresh_token": new_refresh_token,
         "token_type": "bearer"
     }
 
