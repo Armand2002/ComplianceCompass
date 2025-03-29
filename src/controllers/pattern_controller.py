@@ -12,6 +12,7 @@ from src.models.vulnerability import Vulnerability
 from src.models.user_model import User
 from src.models.implementation_example import ImplementationExample
 from src.schemas.privacy_pattern import PatternCreate, PatternUpdate
+from src.utils.cache import cached
 
 class PatternController:
     """
@@ -296,6 +297,7 @@ class PatternController:
         return True
     
     @staticmethod
+    @cached(ttl=300)  # Cache per 5 minuti
     def get_pattern_stats(db: Session) -> Dict[str, Any]:
         """
         Recupera statistiche sui pattern.
@@ -326,56 +328,75 @@ class PatternController:
             "mvc_components": {m: c for m, c in mvc_counts}
         }
     
-@staticmethod
-def get_patterns_by_category(db: Session, category: str) -> List[PrivacyPattern]:
-    """
-    Recupera pattern per categoria.
-    
-    Args:
-        db (Session): Sessione database
-        category (str): Categoria da filtrare
+    @staticmethod
+    def get_patterns_by_category(db: Session, category: str) -> List[PrivacyPattern]:
+        """
+        Recupera pattern per categoria.
         
-    Returns:
-        List[PrivacyPattern]: Lista di pattern nella categoria
-    """
-    patterns = db.query(PrivacyPattern).filter(
-        PrivacyPattern.strategy == category
-    ).all()
-    
-    return patterns
+        Args:
+            db (Session): Sessione database
+            category (str): Categoria da filtrare
+            
+        Returns:
+            List[PrivacyPattern]: Lista di pattern nella categoria
+        """
+        patterns = db.query(PrivacyPattern).filter(
+            PrivacyPattern.strategy == category
+        ).all()
+        
+        return patterns
 
-@staticmethod
-def get_related_patterns(db: Session, pattern: PrivacyPattern, limit: int = 5) -> List[PrivacyPattern]:
-    """
-    Trova pattern correlati a un pattern specifico.
-    
-    Args:
-        db (Session): Sessione database
-        pattern (PrivacyPattern): Pattern di riferimento
-        limit (int): Numero massimo di pattern da restituire
+    @staticmethod
+    def get_related_patterns(db: Session, pattern: PrivacyPattern, limit: int = 5) -> List[PrivacyPattern]:
+        """
+        Trova pattern correlati a un pattern specifico.
         
-    Returns:
-        List[PrivacyPattern]: Lista di pattern correlati
-    """
-    # Raccogli gli ID degli articoli GDPR correlati
-    gdpr_ids = [article.id for article in pattern.gdpr_articles]
-    
-    # Cerca pattern che condividono articoli GDPR
-    query = db.query(PrivacyPattern).filter(
-        PrivacyPattern.id != pattern.id  # Escludi il pattern corrente
-    ).join(
-        PrivacyPattern.gdpr_articles
-    ).filter(
-        GDPRArticle.id.in_(gdpr_ids)
-    ).distinct()
-    
-    # Aggiungi pattern della stessa strategia
-    query_strategy = db.query(PrivacyPattern).filter(
-        PrivacyPattern.id != pattern.id,  # Escludi il pattern corrente
-        PrivacyPattern.strategy == pattern.strategy
-    )
-    
-    # Unisci i risultati e limita
-    related_patterns = query.union(query_strategy).limit(limit).all()
-    
-    return related_patterns
+        Args:
+            db (Session): Sessione database
+            pattern (PrivacyPattern): Pattern di riferimento
+            limit (int): Numero massimo di pattern da restituire
+            
+        Returns:
+            List[PrivacyPattern]: Lista di pattern correlati
+        """
+        # Raccogli gli ID degli articoli GDPR correlati
+        gdpr_ids = [article.id for article in pattern.gdpr_articles]
+        
+        # Cerca pattern che condividono articoli GDPR
+        query = db.query(PrivacyPattern).filter(
+            PrivacyPattern.id != pattern.id  # Escludi il pattern corrente
+        ).join(
+            PrivacyPattern.gdpr_articles
+        ).filter(
+            GDPRArticle.id.in_(gdpr_ids)
+        ).distinct()
+        
+        # Aggiungi pattern della stessa strategia
+        query_strategy = db.query(PrivacyPattern).filter(
+            PrivacyPattern.id != pattern.id,  # Escludi il pattern corrente
+            PrivacyPattern.strategy == pattern.strategy
+        )
+        
+        # Unisci i risultati e limita
+        related_patterns = query.union(query_strategy).limit(limit).all()
+        
+        return related_patterns
+
+    @staticmethod
+    def get_trending_patterns(db: Session, limit: int = 5) -> List[PrivacyPattern]:
+        """
+        Ottiene i pattern più visualizzati o popolari.
+        
+        Args:
+            db (Session): Sessione database
+            limit (int): Numero massimo di pattern da restituire
+            
+        Returns:
+            List[PrivacyPattern]: Lista dei pattern più popolari
+        """
+        patterns = db.query(PrivacyPattern)\
+            .order_by(PrivacyPattern.view_count.desc(), PrivacyPattern.created_at.desc())\
+            .limit(limit)\
+            .all()
+        
+        return patterns

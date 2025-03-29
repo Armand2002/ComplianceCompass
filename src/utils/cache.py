@@ -1,7 +1,16 @@
 # src/utils/cache.py
+from functools import wraps
 import time
 from typing import Dict, Any, Callable, Optional
-from functools import wraps
+
+# Singleton cache globale
+_cache_instance = None
+
+def get_cache():
+    global _cache_instance
+    if _cache_instance is None:
+        _cache_instance = SimpleCache()
+    return _cache_instance
 
 class SimpleCache:
     """
@@ -71,10 +80,6 @@ class SimpleCache:
         self.cache.clear()
 
 
-# Singleton cache globale
-cache = SimpleCache()
-
-
 def cached(ttl: Optional[int] = None):
     """
     Decoratore per cachare il risultato di una funzione.
@@ -98,7 +103,7 @@ def cached(ttl: Optional[int] = None):
                 
             cache_key = ":".join(key_parts)
             
-            # Controlla se il risultato è già in cache
+            cache = get_cache()
             cached_result = cache.get(cache_key)
             if cached_result is not None:
                 return cached_result

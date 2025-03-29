@@ -27,7 +27,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Crea applicazione FastAPI
 app = FastAPI(
-    title=settings.APP_NAME,
+    title="Compliance Compass API",
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
     docs_url="/api/docs" if not settings.ENVIRONMENT == "production" else None,
