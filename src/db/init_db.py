@@ -14,6 +14,19 @@ ADMIN_EMAIL = "admin@compliancecompass.com"
 ADMIN_PASSWORD = "admin123"  # In produzione, usa una password sicura e variabili d'ambiente
 ADMIN_USERNAME = "admin"
 
+def verify_database_connection():
+    """Verifica la connessione al database."""
+    try:
+        # Tenta di creare una connessione
+        with engine.connect() as conn:
+            result = conn.execute("SELECT 1")
+            if result:
+                logger.info("Connessione al database verificata con successo")
+                return True
+    except Exception as e:
+        logger.error(f"Impossibile connettersi al database: {str(e)}")
+        return False
+
 def init_db() -> None:
     # Crea tabelle
     logger.info("Creazione tabelle nel database...")

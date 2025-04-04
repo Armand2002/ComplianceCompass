@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from src.models.privacy_pattern import PrivacyPattern, PatternGdprRelation, PatternPbdRelation, PatternIsoRelation, PatternVulnerabilityRelation
+from src.models.privacy_pattern import PrivacyPattern, pattern_gdpr_association, pattern_pbd_association, pattern_iso_association, pattern_vulnerability_association
 from src.models.user_model import User
 
 logger = logging.getLogger(__name__)
@@ -61,27 +61,31 @@ class PatternService:
         
         # Filtra per articolo GDPR
         if gdpr_id:
-            query = query.join(PatternGdprRelation).filter(
-                PatternGdprRelation.gdpr_article_id == gdpr_id
-            )
+            query = query.join(
+                pattern_gdpr_association, 
+                PrivacyPattern.id == pattern_gdpr_association.c.pattern_id
+            ).filter(pattern_gdpr_association.c.gdpr_id == gdpr_id)
         
         # Filtra per principio PbD
         if pbd_id:
-            query = query.join(PatternPbdRelation).filter(
-                PatternPbdRelation.pbd_principle_id == pbd_id
-            )
+            query = query.join(
+                pattern_pbd_association,
+                PrivacyPattern.id == pattern_pbd_association.c.pattern_id
+            ).filter(pattern_pbd_association.c.pbd_id == pbd_id)
         
         # Filtra per fase ISO
         if iso_id:
-            query = query.join(PatternIsoRelation).filter(
-                PatternIsoRelation.iso_phase_id == iso_id
-            )
+            query = query.join(
+                pattern_iso_association,
+                PrivacyPattern.id == pattern_iso_association.c.pattern_id
+            ).filter(pattern_iso_association.c.iso_id == iso_id)
         
         # Filtra per vulnerabilità
         if vulnerability_id:
-            query = query.join(PatternVulnerabilityRelation).filter(
-                PatternVulnerabilityRelation.vulnerability_id == vulnerability_id
-            )
+            query = query.join(
+                pattern_vulnerability_association,
+                PrivacyPattern.id == pattern_vulnerability_association.c.pattern_id
+            ).filter(pattern_vulnerability_association.c.vulnerability_id == vulnerability_id)
         
         # Filtra per creatore
         if user_id:

@@ -54,6 +54,8 @@ class PrivacyPattern(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by_id = Column(Integer, ForeignKey('users.id'))
+    # Aggiungiamo un campo per conteggiare le visualizzazioni, utilizzato in alcuni metodi
+    view_count = Column(Integer, default=0)
     
     # Relazioni
     gdpr_articles = relationship("GDPRArticle", secondary=pattern_gdpr_association, back_populates="patterns")

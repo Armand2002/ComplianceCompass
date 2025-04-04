@@ -298,7 +298,7 @@ def seed_vulnerabilities(db):
     db.commit()
     logger.info("Vulnerabilità create con successo!")
 
-def seed_privacy_patterns(db, admin_user):
+def seed_privacy_patterns(db, admin_user, skip_elastic=False):
     """Crea alcuni pattern di privacy di esempio."""
     logger.info("Creazione pattern di privacy di esempio...")
     
@@ -393,43 +393,58 @@ def seed_privacy_patterns(db, admin_user):
     db.commit()
     logger.info("Pattern di privacy creati con successo!")
     
-    # Indicizza i pattern in Elasticsearch
-    try:
-        search_service = SearchService()
-        if search_service.es:
-            for pattern in db.query(PrivacyPattern).all():
-                search_service.index_pattern(pattern)
-            logger.info("Pattern indicizzati in Elasticsearch con successo!")
-        else:
-            logger.warning("Elasticsearch non disponibile. I pattern non sono stati indicizzati.")
-    except Exception as e:
-        logger.error(f"Errore nell'indicizzazione dei pattern: {str(e)}")
+    # Indicizza i pattern in Elasticsearch se non viene saltato
+    if not skip_elastic:
+        try:
+            search_service = SearchService()
+            if search_service.es:
+                for pattern in db.query(PrivacyPattern).all():
+                    search_service.index_pattern(pattern)
+                logger.info("Pattern indicizzati in Elasticsearch con successo!")
+            else:
+                logger.warning("Elasticsearch non disponibile. I pattern non sono stati indicizzati.")
+        except Exception as e:
+            logger.error(f"Errore nell'indicizzazione dei pattern: {str(e)}")
 
 
 def main():
     """Funzione principale per eseguire tutte le operazioni di seeding."""
     logger.info("Avvio popolamento database...")
     
+    # Parsing degli argomenti da riga di comando
+    import argparse
+    parser = argparse.ArgumentParser(description='Popola il database con dati iniziali.')
+    parser.add_argument('--admin-only', action='store_true', help='Crea solo l\'utente admin')
+    parser.add_argument('--skip-admin', action='store_true', help='Salta la creazione dell\'utente admin')
+    parser.add_argument('--skip-patterns', action='store_true', help='Salta la creazione dei pattern')
+    parser.add_argument('--skip-elastic', action='store_true', help='Salta l\'indicizzazione in Elasticsearch')
+    args = parser.parse_args()
+    
     # Crea la sessione del database
     db = SessionLocal()
     
     try:
-        # Crea utente admin
-        admin_user = seed_admin_user(db)
-        
+        # Crea utente admin se non specificato diversamente
+        admin_user = None
+        if not args.skip_admin:
+            admin_user = seed_admin_user(db)
+            
+        # Se richiesto solo admin, termina qui
+        if args.admin_only:
+            logger.info("Creazione del solo utente admin completata.")
+            return
+            
         # Popola entità di base
         seed_gdpr_articles(db)
         seed_pbd_principles(db)
         seed_iso_phases(db)
         seed_vulnerabilities(db)
         
-        # Popola pattern di privacy
-        seed_privacy_patterns(db, admin_user)
+        # Popola pattern di privacy se non viene saltato
+        if not args.skip_patterns and admin_user:
+            seed_privacy_patterns(db, admin_user, skip_elastic=args.skip_elastic)
         
         logger.info("Popolamento database completato con successo!")
-    except IntegrityError as e:
-        db.rollback()
-        logger.error(f"Errore di integrità nel database: {str(e)}")
     except Exception as e:
         db.rollback()
         logger.error(f"Errore durante il popolamento del database: {str(e)}")

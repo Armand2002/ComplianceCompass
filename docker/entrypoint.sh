@@ -2,8 +2,10 @@
 
 # Attendi che il database sia pronto
 echo "Attesa per il database..."
-while ! curl -s http://db:5432/ >/dev/null; do
-  sleep 1
+export PGPASSWORD=$POSTGRES_PASSWORD
+until pg_isready -h db -U postgres; do
+  echo "Il database non è ancora pronto - attendo..."
+  sleep 2
 done
 echo "Database disponibile!"
 

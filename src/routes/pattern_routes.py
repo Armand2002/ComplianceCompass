@@ -125,7 +125,7 @@ async def update_pattern(
 async def delete_pattern(
     pattern_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(permission_required("delete"))
+    current_user: User = Depends(get_current_admin_user)  # Usa get_current_admin_user invece
 ):
     """
     Elimina un privacy pattern.
