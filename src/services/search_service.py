@@ -22,12 +22,12 @@ class SearchService:
         self.index_name = "privacy_patterns"
         
         try:
-            self.es = Elasticsearch(settings.ELASTICSEARCH_URL)
+            self.es = Elasticsearch(settings.ELASTICSEARCH_URL, retry_on_timeout=True, max_retries=3)
             if not self.es.ping():
                 logger.warning("Impossibile connettersi a Elasticsearch. Ricerca avanzata non disponibile.")
                 self.es = None
-        except exceptions.ConnectionError:
-            logger.warning("Elasticsearch non disponibile. Ricerca avanzata non disponibile.")
+        except Exception as e:
+            logger.warning(f"Errore connessione Elasticsearch: {str(e)}. Ricerca avanzata non disponibile.")
             self.es = None
     
     def create_index(self) -> bool:

@@ -43,15 +43,15 @@ class AuthController:
     @staticmethod
     def login(db: Session, form_data: OAuth2PasswordRequestForm) -> dict:
         """
-        Gestisce il login utente e genera un token JWT.
-        
+        Gestisce il login utente e genera token JWT.
+    
         Args:
             db (Session): Sessione database
             form_data (OAuth2PasswordRequestForm): Dati di login
-            
+        
         Returns:
-            dict: Token di accesso
-            
+            dict: Token di accesso e refresh token
+        
         Raises:
             HTTPException: Se le credenziali sono errate
         """
@@ -60,31 +60,31 @@ class AuthController:
             email=form_data.username,  # OAuth2 usa username, ma noi usiamo email
             password=form_data.password
         )
-        
+    
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email o password non corrette",
-                headers={"WWW-Authenticate": "Bearer"},
+              status_code=status.HTTP_401_UNAUTHORIZED,
+              detail="Email o password non corrette",
+              headers={"WWW-Authenticate": "Bearer"},
             )
-        
+    
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account disattivato"
             )
-        
+    
         # Genera token JWT
-        access_token = create_access_token(
-            data={"sub": user.id}
-        )
-        
+        access_token = create_access_token(data={"sub": user.id})
+        refresh_token = create_refresh_token(data={"sub": user.id})
+    
         # Aggiorna l'ultimo accesso
         user.last_login = datetime.utcnow()
         db.commit()
-        
+    
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer"
         }
     
@@ -163,53 +163,3 @@ class AuthController:
         db.commit()
         
         return True
-    
-    # Modifiche a src/controllers/auth_controller.py
-
-    @staticmethod
-    def login(db: Session, form_data: OAuth2PasswordRequestForm) -> dict:
-        """
-        Gestisce il login utente e genera token JWT.
-    
-        Args:
-            db (Session): Sessione database
-            form_data (OAuth2PasswordRequestForm): Dati di login
-        
-        Returns:
-            dict: Token di accesso e refresh token
-        
-        Raises:
-            HTTPException: Se le credenziali sono errate
-        """
-        user = AuthController.authenticate_user(
-            db=db, 
-            email=form_data.username,  # OAuth2 usa username, ma noi usiamo email
-            password=form_data.password
-        )
-    
-        if not user:
-            raise HTTPException(
-              status_code=status.HTTP_401_UNAUTHORIZED,
-              detail="Email o password non corrette",
-              headers={"WWW-Authenticate": "Bearer"},
-            )
-    
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account disattivato"
-            )
-    
-        # Genera token JWT
-        access_token = create_access_token(data={"sub": user.id})
-        refresh_token = create_refresh_token(data={"sub": user.id})
-    
-        # Aggiorna l'ultimo accesso
-        user.last_login = datetime.utcnow()
-        db.commit()
-    
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer"
-        }
