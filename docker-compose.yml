@@ -1,32 +1,6 @@
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.api
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/compliance_compass
-      - JWT_SECRET_KEY=compliance_compass_secret_key_development
-      - ACCESS_TOKEN_EXPIRE_MINUTES=60
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
-    depends_on:
-      - db
-    command: sh -c "python -m src.db.init_db && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
-    networks:
-      - compliance_compass_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-
   db:
     image: postgres:14
     volumes:
@@ -37,50 +11,17 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=compliance_compass
-    networks:
-      - compliance_compass_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.7
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api.simplified
+    ports:
+      - "8000:8000"
     environment:
-      - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    networks:
-      - compliance_compass_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  frontend:
-    image: node:18-alpine
-    volumes:
-      - ./frontend:/app
-    working_dir: /app
-    ports:
-      - "3000:3000"
-    command: sh -c "if [ -f package.json ]; then npm install && npm start; else echo 'Waiting for frontend code' && tail -f /dev/null; fi"
-    networks:
-      - compliance_compass_network
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/compliance_compass
     depends_on:
-      - api
-
-networks:
-  compliance_compass_network:
+      - db
 
 volumes:
   postgres_data:
-  elasticsearch_data:

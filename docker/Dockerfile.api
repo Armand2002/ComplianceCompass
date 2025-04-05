@@ -23,7 +23,7 @@ RUN useradd --create-home appuser && chown -R appuser:appuser /app
 # Imposta variabili d'ambiente
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    ENVIRONMENT=production
+    ENVIRONMENT=development
 
 # Installa le dipendenze di sistema per il runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,8 +39,9 @@ RUN pip install --no-cache /wheels/*
 COPY --chown=appuser:appuser alembic/ /app/alembic/
 COPY --chown=appuser:appuser scripts/ /app/scripts/
 COPY --chown=appuser:appuser src/ /app/src/
+COPY --chown=appuser:appuser requirements.txt /app/
 
-# Invece di copiare il file che non esiste, lo creiamo direttamente nel container
+# Crea il file alembic.ini
 RUN echo "[alembic]\n\
 script_location = alembic\n\
 prepend_sys_path = .\n\
@@ -86,15 +87,15 @@ datefmt = %%H:%%M:%%S" > /app/alembic.ini && chown appuser:appuser /app/alembic.
 # Cartella per i dati persistenti
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 
+# Copia lo script di entrypoint
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Cambia all'utente non-root
 USER appuser
 
 # Esponi la porta
 EXPOSE 8000
-
-# Script di entrypoint per migrazioni e avvio
-COPY --chown=appuser:appuser docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
