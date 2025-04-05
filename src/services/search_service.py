@@ -3,6 +3,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from elasticsearch import Elasticsearch, exceptions
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from src.config import settings
 from src.models.privacy_pattern import PrivacyPattern
@@ -327,20 +328,7 @@ class SearchService:
             results = []
             for hit in hits:
                 source = hit["_source"]
-                results.append({
-                    "id": source["id"],
-                    "title": source["title"],
-                    "description": source["description"],
-                    "strategy": source["strategy"],
-                    "mvc_component": source["mvc_component"],
-                    "created_at": source["created_at"],
-                    "updated_at": source["updated_at"],
-                    "score": hit["_score"],
-                    "gdpr_articles": source.get("gdpr_articles", []),
-                    "pbd_principles": source.get("pbd_principles", []),
-                    "iso_phases": source.get("iso_phases", []),
-                    "vulnerabilities": source.get("vulnerabilities", [])
-                })
+                results.append(source)
             
             return {
                 "total": total,
@@ -355,3 +343,136 @@ class SearchService:
         except Exception as e:
             logger.error(f"Errore imprevisto nella ricerca Elasticsearch: {str(e)}")
             return {"total": 0, "results": [], "error": "general_error"}
+    
+    def get_autocomplete_suggestions(
+        self, 
+        query: str,
+        limit: int = 10,
+        fields: List[str] = ["title", "description", "strategy"],
+        db: Session = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Ottiene suggerimenti di autocompletamento basati sul query utente.
+        
+        Args:
+            query (str): Query utente parziale
+            limit (int): Numero massimo di suggerimenti
+            fields (List[str]): Campi su cui effettuare l'autocomplete
+            db (Session): Sessione database per il fallback
+            
+        Returns:
+            List[Dict[str, Any]]: Lista di suggerimenti
+        """
+        if not self.es or not query:
+            # Fallback alla ricerca DB se ES non disponibile
+            return self._db_autocomplete_fallback(db, query, limit) if db else []
+        
+        try:
+            # Crea una query multi-field più sofisticata
+            should_clauses = []
+            for field in fields:
+                should_clauses.append({
+                    "match_phrase_prefix": {
+                        field: {
+                            "query": query,
+                            "max_expansions": 10,
+                            "slop": 2,
+                            "boost": 2.0 if field == "title" else 1.0
+                        }
+                    }
+                })
+            
+            body = {
+                "size": limit,
+                "_source": ["id", "title", "strategy", "description"],
+                "query": {
+                    "bool": {
+                        "should": should_clauses,
+                        "minimum_should_match": 1
+                    }
+                },
+                "highlight": {
+                    "fields": {
+                        "title": {"number_of_fragments": 0},
+                        "description": {"fragment_size": 50, "number_of_fragments": 1}
+                    },
+                    "pre_tags": ["<strong>"],
+                    "post_tags": ["</strong>"]
+                }
+            }
+            
+            response = self.es.search(
+                index=self.index_name,
+                body=body
+            )
+            
+            suggestions = []
+            for hit in response["hits"]["hits"]:
+                source = hit["_source"]
+                highlights = hit.get("highlight", {})
+                
+                # Usa highlight se disponibile, altrimenti usa source
+                title = highlights.get("title", [source["title"]])[0]
+                description = highlights.get(
+                    "description", 
+                    [source["description"][:50] + "..."] if len(source["description"]) > 50 else [source["description"]]
+                )[0]
+                
+                suggestions.append({
+                    "id": source["id"],
+                    "title": title,
+                    "strategy": source["strategy"],
+                    "description": description,
+                    "score": hit["_score"]
+                })
+            
+            return suggestions
+        
+        except Exception as e:
+            logger.error(f"Errore in autocomplete: {str(e)}")
+            return self._db_autocomplete_fallback(db, query, limit) if db else []
+    
+    def _db_autocomplete_fallback(self, db: Session, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Metodo di fallback per autocomplete usando il database standard.
+        
+        Args:
+            db (Session): Sessione database
+            query (str): Query utente parziale
+            limit (int): Numero massimo di suggerimenti
+            
+        Returns:
+            List[Dict[str, Any]]: Lista di suggerimenti
+        """
+        if not db or not query:
+            return []
+        
+        try:
+            # Query SQL con LIKE per imitare autocomplete
+            like_term = f"%{query}%"
+            patterns = db.query(PrivacyPattern).filter(
+                or_(
+                    PrivacyPattern.title.ilike(like_term),
+                    PrivacyPattern.description.ilike(like_term),
+                    PrivacyPattern.strategy.ilike(like_term)
+                )
+            ).limit(limit).all()
+            
+            suggestions = []
+            for pattern in patterns:
+                # Crea un excerpt della descrizione
+                description = pattern.description[:50] + "..." if len(pattern.description) > 50 else pattern.description
+                
+                suggestions.append({
+                    "id": pattern.id,
+                    "title": pattern.title,
+                    "strategy": pattern.strategy,
+                    "description": description,
+                    "score": 1.0  # Score uniforme per il fallback
+                })
+            
+            return suggestions
+        
+        except Exception as e:
+            logger.error(f"Errore nel fallback autocomplete DB: {str(e)}")
+            return []

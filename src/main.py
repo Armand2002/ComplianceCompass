@@ -17,6 +17,7 @@ from src.services.elasticsearch_init import ElasticsearchInit
 from src.middleware.error_handler import register_exception_handlers
 from starlette.middleware import CSRFMiddleware
 from src.logging_config import configure_logging
+from src.middleware.response_formatter import ResponseFormatterMiddleware
 
 # Configura logging con impostazioni dall'environment
 configure_logging(
@@ -32,11 +33,63 @@ limiter = Limiter(key_func=get_remote_address)
 # Crea applicazione FastAPI
 app = FastAPI(
     title="Compliance Compass API",
-    description=settings.APP_DESCRIPTION,
+    description="""
+    API per la piattaforma Compliance Compass che fornisce accesso a:
+    
+    * Privacy Patterns
+    * Articoli GDPR
+    * Principi Privacy by Design
+    * Fasi ISO
+    * Vulnerabilità
+    
+    Questa API supporta operazioni CRUD complete per tutte le entità.
+    """,
     version=settings.APP_VERSION,
     docs_url="/api/docs" if not settings.ENVIRONMENT == "production" else None,
     redoc_url="/api/redoc" if not settings.ENVIRONMENT == "production" else None,
+    openapi_tags=[
+        {
+            "name": "autenticazione",
+            "description": "Operazioni di autenticazione e gestione utenti"
+        },
+        {
+            "name": "privacy-patterns",
+            "description": "Operazioni sui Privacy Patterns"
+        },
+        {
+            "name": "ricerca",
+            "description": "Funzionalità di ricerca avanzata"
+        },
+        {
+            "name": "notifiche",
+            "description": "Gestione delle notifiche"
+        },
+        {
+            "name": "chatbot",
+            "description": "Interazione con l'assistente virtuale"
+        },
+        {
+            "name": "monitoraggio",
+            "description": "Endpoint per monitoring e health check"
+        }
+    ],
+    openapi_url="/api/openapi.json",
+    contact={
+        "name": "Team Compliance Compass",
+        "email": "support@compliancecompass.example.com"
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT"
+    },
+    swagger_ui_parameters={
+        "defaultModelsExpandDepth": -1,  # Hide schemas section by default
+        "displayRequestDuration": True,
+        "docExpansion": "none",
+        "filter": True
+    }
 )
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -49,13 +102,17 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# In src/main.py - Verificare che il middleware sia correttamente applicato
+# Aggiungi il middleware per la formattazione delle risposte
+app.add_middleware(ResponseFormatterMiddleware)
+
+# Middleware per rate limiting
 app.add_middleware(
     RateLimitMiddleware,
     limit=settings.RATE_LIMIT_DEFAULT,
     interval=60
 )
 
+# Middleware per CSRF
 app.add_middleware(
     CSRFMiddleware,
     secret=settings.SECRET_KEY,

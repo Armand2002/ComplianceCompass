@@ -338,88 +338,244 @@ class TestPatternRoutes:
         # Arrange
         headers = {"Authorization": f"Bearer {user_token}"}
         # Crea pattern con specifica strategia
+        test_strategy = "UniqueStrategyTest"
         pattern_data = {
-            "title": "Pattern By Strategy",
-            "description": "This is a test pattern for strategy endpoint",
+            "title": "Strategy Specific Pattern",
+            "description": "Pattern for strategy test",
             "context": "Test context",
             "problem": "Test problem",
             "solution": "Test solution",
             "consequences": "Test consequences",
-            "strategy": "UniqueStrategy",
+            "strategy": test_strategy,
             "mvc_component": "Model"
         }
         client.post("/api/patterns/", json=pattern_data, headers=headers)
         
         # Act
-        response = client.get("/api/patterns/by-strategy/UniqueStrategy", headers=headers)
+        response = client.get(f"/api/patterns/by-strategy/{test_strategy}", headers=headers)
         
         # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data) > 0
-        assert all(p["strategy"] == "UniqueStrategy" for p in data)
+        assert all(p["strategy"] == test_strategy for p in data)
     
     def test_get_patterns_by_mvc(self, client, user_token, db):
         """Verifica l'endpoint di ricerca pattern per componente MVC."""
         # Arrange
         headers = {"Authorization": f"Bearer {user_token}"}
         # Crea pattern con specifico componente MVC
+        test_component = "Controller"
         pattern_data = {
-            "title": "Pattern By MVC",
-            "description": "This is a test pattern for MVC endpoint",
+            "title": "MVC Specific Pattern",
+            "description": "Pattern for MVC component test",
             "context": "Test context",
             "problem": "Test problem",
             "solution": "Test solution",
             "consequences": "Test consequences",
-            "strategy": "Test",
-            "mvc_component": "Controller"
+            "strategy": "TestStrategy",
+            "mvc_component": test_component
         }
         client.post("/api/patterns/", json=pattern_data, headers=headers)
         
         # Act
-        response = client.get("/api/patterns/by-mvc/Controller", headers=headers)
+        response = client.get(f"/api/patterns/by-mvc/{test_component}", headers=headers)
         
         # Assert
         assert response.status_code == 200
         data = response.json()
         assert len(data) > 0
-        assert all(p["mvc_component"] == "Controller" for p in data)
+        assert all(p["mvc_component"] == test_component for p in data)
     
     def test_get_related_patterns(self, client, user_token, db):
-        """Verifica l'endpoint per ottenere pattern correlati."""
+        """Verifica l'endpoint di recupero pattern correlati."""
         # Arrange
         headers = {"Authorization": f"Bearer {user_token}"}
-        # Crea alcuni pattern con caratteristiche simili
-        pattern1 = {
-            "title": "Related Pattern 1",
-            "description": "This is a test pattern for related patterns",
-            "context": "Test context",
-            "problem": "Test problem",
-            "solution": "Test solution",
-            "consequences": "Test consequences",
-            "strategy": "RelatedStrategy",
-            "mvc_component": "Model"
-        }
-        pattern2 = {
-            "title": "Related Pattern 2",
-            "description": "This is another test pattern that is related",
-            "context": "Test context",
-            "problem": "Test problem",
-            "solution": "Test solution",
-            "consequences": "Test consequences",
-            "strategy": "RelatedStrategy",
+        
+        # Crea un pattern principale e alcuni pattern correlati
+        main_pattern = {
+            "title": "Main Related Pattern",
+            "description": "This is the main pattern for testing related patterns",
+            "context": "Test context for related patterns",
+            "problem": "Test problem for related patterns",
+            "solution": "Test solution for related patterns",
+            "consequences": "Test consequences for related patterns",
+            "strategy": "RelatedTest",
             "mvc_component": "Model"
         }
         
-        response1 = client.post("/api/patterns/", json=pattern1, headers=headers)
-        client.post("/api/patterns/", json=pattern2, headers=headers)
-        pattern_id = response1.json()["id"]
+        main_response = client.post("/api/patterns/", json=main_pattern, headers=headers)
+        main_pattern_id = main_response.json()["id"]
+        
+        # Crea altri pattern che dovrebbero essere correlati
+        for i in range(5):
+            related_pattern = {
+                "title": f"Related Pattern {i}",
+                "description": "This is a pattern related to the main pattern",
+                "context": "Similar context to main pattern",
+                "problem": "Similar problem to main pattern",
+                "solution": "Similar solution to main pattern",
+                "consequences": "Similar consequences to main pattern",
+                "strategy": "RelatedTest",  # Stessa strategia per garantire correlazione
+                "mvc_component": "Model"
+            }
+            client.post("/api/patterns/", json=related_pattern, headers=headers)
         
         # Act
-        response = client.get(f"/api/patterns/related/{pattern_id}", headers=headers)
+        response = client.get(f"/api/patterns/related/{main_pattern_id}", headers=headers)
         
         # Assert
         assert response.status_code == 200
         data = response.json()
-        # Dovrebbe avere almeno un pattern correlato (pattern2)
         assert len(data) > 0
+        for pattern in data:
+            assert pattern["id"] != main_pattern_id  # Non dovrebbe includere il pattern principale
+        
+        # Verifica il caso di pattern inesistente
+        nonexistent_id = 99999
+        error_response = client.get(f"/api/patterns/related/{nonexistent_id}", headers=headers)
+        assert error_response.status_code == 404
+    
+    def test_get_patterns_pagination(self, client, user_token, db):
+        """Verifica che la paginazione funzioni correttamente."""
+        # Arrange
+        headers = {"Authorization": f"Bearer {user_token}"}
+        
+        # Crea 25 pattern di test
+        for i in range(25):
+            pattern_data = {
+                "title": f"Test Pattern {i}",
+                "description": f"Test description {i}",
+                "context": "Test context",
+                "problem": "Test problem",
+                "solution": "Test solution",
+                "consequences": "Test consequences",
+                "strategy": "Test",
+                "mvc_component": "Model"
+            }
+            client.post("/api/patterns/", json=pattern_data, headers=headers)
+        
+        # Act - Richiedi prima pagina (10 risultati)
+        response1 = client.get("/api/patterns/?limit=10&skip=0", headers=headers)
+        
+        # Act - Richiedi seconda pagina (10 risultati)
+        response2 = client.get("/api/patterns/?limit=10&skip=10", headers=headers)
+        
+        # Act - Richiedi terza pagina (5 risultati)
+        response3 = client.get("/api/patterns/?limit=10&skip=20", headers=headers)
+        
+        # Assert
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        assert response3.status_code == 200
+        
+        data1 = response1.json()
+        data2 = response2.json()
+        data3 = response3.json()
+        
+        assert len(data1["patterns"]) == 10
+        assert len(data2["patterns"]) == 10
+        assert len(data3["patterns"]) >= 5  # Almeno 5 risultati
+        
+        # Verifica che i pattern siano diversi tra le pagine
+        page1_ids = {p["id"] for p in data1["patterns"]}
+        page2_ids = {p["id"] for p in data2["patterns"]}
+        page3_ids = {p["id"] for p in data3["patterns"]}
+        
+        assert not page1_ids.intersection(page2_ids)
+        assert not page1_ids.intersection(page3_ids)
+        assert not page2_ids.intersection(page3_ids)
+        
+        # Verifica che i metadati di paginazione siano corretti
+        assert data1["total"] >= 25
+        assert data1["page"] == 1
+        assert data1["size"] == 10
+        assert data1["pages"] >= 3
+        
+        assert data2["page"] == 2
+        assert data3["page"] == 3
+    
+    def test_get_patterns_with_combined_filters(self, client, user_token, db):
+        """Verifica che i filtri combinati funzionino correttamente."""
+        # Arrange
+        headers = {"Authorization": f"Bearer {user_token}"}
+        
+        # Crea pattern con strategie e componenti MVC diversi
+        strategies = ["Minimize", "Hide", "Separate", "Aggregate", "Inform"]
+        mvc_components = ["Model", "View", "Controller"]
+        
+        for i, strategy in enumerate(strategies):
+            for j, component in enumerate(mvc_components):
+                pattern_data = {
+                    "title": f"Test Pattern {strategy} {component}",
+                    "description": f"Pattern using {strategy} strategy in {component}",
+                    "context": "Test context",
+                    "problem": "Test problem",
+                    "solution": "Test solution",
+                    "consequences": "Test consequences",
+                    "strategy": strategy,
+                    "mvc_component": component
+                }
+                client.post("/api/patterns/", json=pattern_data, headers=headers)
+        
+        # Act - Filtra per strategia
+        response1 = client.get("/api/patterns/?strategy=Minimize", headers=headers)
+        
+        # Act - Filtra per componente MVC
+        response2 = client.get("/api/patterns/?mvc_component=Model", headers=headers)
+        
+        # Act - Filtra per strategia E componente MVC
+        response3 = client.get("/api/patterns/?strategy=Minimize&mvc_component=Model", headers=headers)
+        
+        # Act - Filtra con ricerca testuale
+        response4 = client.get("/api/patterns/?search=Hide", headers=headers)
+        
+        # Assert
+        assert response1.status_code == 200
+        assert response2.status_code == 200
+        assert response3.status_code == 200
+        assert response4.status_code == 200
+        
+        data1 = response1.json()
+        data2 = response2.json()
+        data3 = response3.json()
+        data4 = response4.json()
+        
+        # Verifica filtro per strategia
+        assert all(p["strategy"] == "Minimize" for p in data1["patterns"])
+        assert len(data1["patterns"]) == 3  # Uno per ogni componente MVC
+        
+        # Verifica filtro per componente MVC
+        assert all(p["mvc_component"] == "Model" for p in data2["patterns"])
+        assert len(data2["patterns"]) == 5  # Uno per ogni strategia
+        
+        # Verifica filtro combinato
+        assert all(p["strategy"] == "Minimize" and p["mvc_component"] == "Model" for p in data3["patterns"])
+        assert len(data3["patterns"]) == 1
+        
+        # Verifica ricerca testuale
+        assert all("Hide" in p["title"] or "Hide" in p["description"] for p in data4["patterns"])
+    
+    def test_error_handling_invalid_parameters(self, client, user_token):
+        """Verifica la gestione di parametri non validi."""
+        # Arrange
+        headers = {"Authorization": f"Bearer {user_token}"}
+        
+        # Act - Parametro limit non valido
+        response1 = client.get("/api/patterns/?limit=invalid", headers=headers)
+        
+        # Act - Parametro skip non valido
+        response2 = client.get("/api/patterns/?skip=invalid", headers=headers)
+        
+        # Act - Parametro limit fuori range
+        response3 = client.get("/api/patterns/?limit=1000", headers=headers)
+        
+        # Assert
+        assert response1.status_code == 422  # Unprocessable Entity
+        assert response2.status_code == 422  # Unprocessable Entity
+        assert response3.status_code == 422  # Unprocessable Entity o 400 Bad Request
+        
+        # Verifica formato errori
+        assert "detail" in response1.json()
+        assert "detail" in response2.json()
+        assert "detail" in response3.json()

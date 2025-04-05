@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     """
     # Informazioni applicazione
     APP_NAME: str = "Compliance Compass"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Piattaforma wiki collaborativa per normative tecniche e di sicurezza"
     
     # Ambiente
@@ -71,4 +71,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 # Istanza singleton delle impostazioni
+
 settings = Settings()
