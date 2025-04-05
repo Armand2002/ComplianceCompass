@@ -39,7 +39,49 @@ RUN pip install --no-cache /wheels/*
 COPY --chown=appuser:appuser alembic/ /app/alembic/
 COPY --chown=appuser:appuser scripts/ /app/scripts/
 COPY --chown=appuser:appuser src/ /app/src/
-COPY --chown=appuser:appuser alembic.ini /app/
+
+# Invece di copiare il file che non esiste, lo creiamo direttamente nel container
+RUN echo "[alembic]\n\
+script_location = alembic\n\
+prepend_sys_path = .\n\
+\n\
+# Database connection\n\
+sqlalchemy.url = postgresql://postgres:postgres@db:5432/compliance_compass\n\
+\n\
+# Logging\n\
+[loggers]\n\
+keys = root,sqlalchemy,alembic\n\
+\n\
+[handlers]\n\
+keys = console\n\
+\n\
+[formatters]\n\
+keys = generic\n\
+\n\
+[logger_root]\n\
+level = WARN\n\
+handlers = console\n\
+qualname =\n\
+\n\
+[logger_sqlalchemy]\n\
+level = WARN\n\
+handlers =\n\
+qualname = sqlalchemy.engine\n\
+\n\
+[logger_alembic]\n\
+level = INFO\n\
+handlers =\n\
+qualname = alembic\n\
+\n\
+[handler_console]\n\
+class = StreamHandler\n\
+args = (sys.stderr,)\n\
+level = NOTSET\n\
+formatter = generic\n\
+\n\
+[formatter_generic]\n\
+format = %%(levelname)-5.5s [%%(name)s] %%(message)s\n\
+datefmt = %%H:%%M:%%S" > /app/alembic.ini && chown appuser:appuser /app/alembic.ini
 
 # Cartella per i dati persistenti
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
