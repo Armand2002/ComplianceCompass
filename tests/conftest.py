@@ -1,9 +1,11 @@
 # tests/conftest.py
 """
-Fixtures condivise per i test.
+Configurazioni e fixture condivise per i test.
 
-Questo modulo contiene fixture pytest riutilizzabili in diversi test.
+Fornisce configurazioni globali e fixture riutilizzabili 
+per l'intera suite di test.
 """
+
 import os
 import sys
 from datetime import datetime
@@ -13,7 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Aggiungi la directory principale al path per importare i moduli
+# Aggiungi la directory principale al path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main import app
@@ -22,39 +24,54 @@ from src.models.base import Base
 from src.models.user_model import User, UserRole
 from src.utils.password import get_password_hash
 from src.utils.jwt import create_access_token
+from src.services.elasticsearch_service import ElasticsearchService
 
+# Configurazione del database di test
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
-# Create an in-memory SQLite database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+@pytest.fixture(scope="session")
+def test_engine():
+    """
+    Crea un motore di database in-memory per i test.
+    
+    Returns:
+        Engine: Motore database SQLAlchemy
+    """
+    engine = create_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    return engine
 
 @pytest.fixture(scope="function")
-def db():
+def db(test_engine):
     """
-    Fixture che fornisce una sessione di database di test.
+    Fixture per una sessione database isolata per ogni test.
     
-    Crea un database in-memory fresco per ogni test.
+    Args:
+        test_engine: Motore database di test
+    
+    Returns:
+        Session: Sessione database isolata
     """
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+    # Crea le tabelle
+    Base.metadata.create_all(bind=test_engine)
     
-    # Create a new database session
-    db = TestingSessionLocal()
+    # Crea una sessione
+    SessionLocal = sessionmaker(
+        autocommit=False, 
+        autoflush=False, 
+        bind=test_engine
+    )
+    session = SessionLocal()
     
     try:
-        yield db
+        yield session
     finally:
-        db.close()
-        
-    # Drop all tables after the test
-    Base.metadata.drop_all(bind=engine)
-
+        # Chiudi la sessione e rimuovi le tabelle
+        session.close()
+        Base.metadata.drop_all(bind=test_engine)
 
 @pytest.fixture(scope="function")
 def client(db):
@@ -75,7 +92,6 @@ def client(db):
         yield client
     
     app.dependency_overrides.clear()
-
 
 @pytest.fixture(scope="function")
 def test_user(db):
@@ -104,7 +120,6 @@ def test_user(db):
     
     return user
 
-
 @pytest.fixture(scope="function")
 def test_admin(db):
     """
@@ -132,7 +147,6 @@ def test_admin(db):
     
     return admin
 
-
 @pytest.fixture(scope="function")
 def user_token(test_user):
     """
@@ -140,10 +154,66 @@ def user_token(test_user):
     """
     return create_access_token(data={"sub": test_user.id, "role": test_user.role.value})
 
-
 @pytest.fixture(scope="function")
 def admin_token(test_admin):
     """
     Fixture che fornisce un token JWT per l'utente admin di test.
     """
     return create_access_token(data={"sub": test_admin.id, "role": test_admin.role.value})
+
+@pytest.fixture(scope="session")
+def mock_elasticsearch():
+    """
+    Fixture per un servizio Elasticsearch mock.
+    
+    Returns:
+        ElasticsearchService: Servizio Elasticsearch simulato
+    """
+    es_service = ElasticsearchService()
+    # Assicura che sia disponibile per i test
+    es_service.is_available = True
+    return es_service
+
+def pytest_configure(config):
+    """
+    Hook di configurazione pytest per impostazioni globali.
+    
+    Args:
+        config: Configurazione pytest
+    """
+    # Imposta marker personalizzati
+    config.addinivalue_line(
+        "markers", 
+        "integration: Contrassegna test di integrazione"
+    )
+    config.addinivalue_line(
+        "markers", 
+        "performance: Test di performance"
+    )
+    config.addinivalue_line(
+        "markers", 
+        "security: Test di sicurezza"
+    )
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """
+    Personalizza il sommario finale dei test.
+    
+    Args:
+        terminalreporter: Reporter terminale
+        exitstatus: Stato di uscita
+        config: Configurazione pytest
+    """
+    # Stampa sommario personalizzato
+    terminalreporter.write_line("\n--- Sommario Test Compliance Compass ---")
+    
+    # Counters
+    passed = len(terminalreporter.stats.get('passed', []))
+    failed = len(terminalreporter.stats.get('failed', []))
+    skipped = len(terminalreporter.stats.get('skipped', []))
+    
+    terminalreporter.write_line(
+        f"Test Passati: {passed}, "
+        f"Falliti: {failed}, "
+        f"Skippati: {skipped}"
+    )

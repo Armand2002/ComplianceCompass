@@ -1,0 +1,17 @@
+# Requisiti per testing
+
+# Test Framework
+pytest==7.4.2
+pytest-cov==4.1.0
+pytest-mock==3.11.1
+
+# Librerie per testing
+httpx==0.24.1
+requests-mock==1.11.0
+
+# Copertura codice
+coverage==7.3.1
+
+# Librerie aggiuntive per test
+freezegun==1.2.2  # Per mock di data/tempo
+hypothesis==6.82.1  # Per test generativi

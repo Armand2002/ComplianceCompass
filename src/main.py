@@ -16,12 +16,14 @@ from src.db.init_db import init_db
 from src.services.elasticsearch_init import ElasticsearchInit
 from src.middleware.error_handler import register_exception_handlers
 from starlette.middleware import CSRFMiddleware
+from src.logging_config import configure_logging
 
-# Configurazione logger
-logging.basicConfig(
-    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+# Configura logging con impostazioni dall'environment
+configure_logging(
+    log_level='DEBUG' if settings.DEBUG else 'INFO',
+    log_dir=settings.LOG_DIR if hasattr(settings, 'LOG_DIR') else None
 )
+
 logger = logging.getLogger(__name__)
 
 # Configurazione rate limiter

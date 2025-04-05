@@ -1,0 +1,28 @@
+[run]
+# Directory da includere nella copertura
+source = src
+
+# Esclusioni
+omit = 
+    src/config.py
+    src/main.py
+    src/logging_config.py
+    tests/*
+    */__init__.py
+
+[report]
+# Configurazione report di copertura
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    pass
+    
+# Soglia minima di copertura
+fail_under = 80
+
+[html]
+# Genera report HTML
+directory = coverage_report
