@@ -4,8 +4,6 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from src.utils.jwt import create_access_token, create_refresh_token, verify_token
-from src.utils.password import get_password_hash
 from src.db.session import get_db
 from src.controllers.auth_controller import AuthController
 from src.middleware.auth_middleware import get_current_user
@@ -65,7 +63,7 @@ async def change_password(
     
     AuthController.change_password(
         db=db,
-        user=current_user,
+        user_id=current_user.id,
         current_password=password_data.current_password,
         new_password=password_data.new_password
     )
@@ -91,42 +89,7 @@ async def refresh_token(
     """
     Rinnova un token di accesso usando un refresh token.
     """
-    # Verifica il refresh token
-    payload = verify_token(refresh_token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token di refresh non valido o scaduto"
-        )
-    
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalido"
-        )
-    
-    # Ottieni l'utente
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utente non trovato"
-        )
-    
-    # Crea nuovi token
-    access_token = create_access_token(data={"sub": user.id})
-    new_refresh_token = create_refresh_token(data={"sub": user.id})
-    
-    # Aggiorna l'ultimo accesso
-    user.last_login = datetime.datetime.utcnow()
-    db.commit()
-    
-    return {
-        "access_token": access_token,
-        "refresh_token": new_refresh_token,
-        "token_type": "bearer"
-    }
+    return AuthController.refresh_token(db=db, token=refresh_token)
 
 @router.post("/request-password-reset")
 async def request_password_reset(
@@ -184,8 +147,17 @@ async def reset_password(
             detail="Utente non trovato"
         )
     
+    # Verifica complessità della password
+    if len(reset_data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La password deve essere di almeno 8 caratteri"
+        )
+    
     # Aggiorna password
+    from src.utils.password import get_password_hash
     user.hashed_password = get_password_hash(reset_data.new_password)
+    user.updated_at = datetime.datetime.utcnow()
     db.commit()
     
     return {"message": "Password resettata con successo"}

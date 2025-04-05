@@ -1,5 +1,6 @@
-# Nuovo file src/utils/email.py
+# src/utils/email.py
 import logging
+from jinja2 import Template
 from src.config import settings
 from src.services.email_service import EmailService
 
@@ -20,19 +21,9 @@ def send_password_reset_email(to_email: str, username: str, token: str) -> bool:
     """
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     
-    html_content = f"""
-    <html>
-    <body>
-        <h2>Reset Password - {settings.APP_NAME}</h2>
-        <p>Ciao {username},</p>
-        <p>Hai richiesto il reset della tua password. Clicca sul link seguente per impostare una nuova password:</p>
-        <p><a href="{reset_url}">Reset Password</a></p>
-        <p>Se non hai richiesto questo reset, ignora questa email.</p>
-        <p>Il link scadrà tra 24 ore.</p>
-        <p>Grazie,<br>Il team di {settings.APP_NAME}</p>
-    </body>
-    </html>
-    """
+    with open('templates/reset_password.html') as f:
+        template = Template(f.read())
+    html_content = template.render(username=username, reset_url=reset_url, app_name=settings.APP_NAME)
     
     subject = f"Reset Password - {settings.APP_NAME}"
     

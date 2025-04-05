@@ -1,4 +1,4 @@
-# Nuovo file src/utils/token.py
+# src/utils/token.py
 from datetime import datetime, timedelta
 import secrets
 from typing import Optional
@@ -24,7 +24,8 @@ def generate_verification_token(user_id: int, expiration_hours: int = 24) -> str
         "sub": user_id,
         "exp": expiration,
         "type": "verification",
-        "jti": secrets.token_hex(16)  # ID unico del token
+        "jti": secrets.token_hex(16),  # ID unico del token
+        "iat": datetime.utcnow()
     }
     
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)

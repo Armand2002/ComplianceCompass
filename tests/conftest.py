@@ -6,6 +6,7 @@ Questo modulo contiene fixture pytest riutilizzabili in diversi test.
 """
 import os
 import sys
+from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -81,13 +82,21 @@ def test_user(db):
     """
     Fixture che crea un utente di test nel database.
     """
+    # Verifica se l'utente esiste già
+    user = db.query(User).filter(User.email == "test@example.com").first()
+    if user:
+        return user
+    
+    # Crea un nuovo utente di test
     user = User(
         email="test@example.com",
         username="testuser",
         hashed_password=get_password_hash("password123"),
         full_name="Test User",
         role=UserRole.EDITOR,
-        is_active=True
+        is_active=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     db.add(user)
     db.commit()
@@ -101,13 +110,21 @@ def test_admin(db):
     """
     Fixture che crea un utente admin di test nel database.
     """
+    # Verifica se l'admin esiste già
+    admin = db.query(User).filter(User.email == "admin@example.com").first()
+    if admin:
+        return admin
+    
+    # Crea un nuovo admin di test
     admin = User(
         email="admin@example.com",
         username="admin",
         hashed_password=get_password_hash("admin123"),
         full_name="Admin User",
         role=UserRole.ADMIN,
-        is_active=True
+        is_active=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
     db.add(admin)
     db.commit()
@@ -121,7 +138,7 @@ def user_token(test_user):
     """
     Fixture che fornisce un token JWT per l'utente di test.
     """
-    return create_access_token({"sub": test_user.id})
+    return create_access_token(data={"sub": test_user.id, "role": test_user.role.value})
 
 
 @pytest.fixture(scope="function")
@@ -129,4 +146,4 @@ def admin_token(test_admin):
     """
     Fixture che fornisce un token JWT per l'utente admin di test.
     """
-    return create_access_token({"sub": test_admin.id})
+    return create_access_token(data={"sub": test_admin.id, "role": test_admin.role.value})

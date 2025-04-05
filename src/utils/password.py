@@ -1,7 +1,7 @@
 # src/utils/password.py
 from passlib.context import CryptContext
 
-# Contesto per l'hashing delle password
+# Contesto per l'hashing delle password con bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

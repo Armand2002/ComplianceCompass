@@ -8,7 +8,7 @@ from typing import Optional
 
 from src.db.session import get_db
 from src.utils.jwt import decode_token
-from src.models.user_model import User
+from src.models.user_model import User, UserRole
 
 # OAuth2 schema per l'estrazione del token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -40,7 +40,14 @@ async def get_current_user(
         payload = decode_token(token)
         user_id: Optional[int] = payload.get("sub")
         
-        if user_id is None:
+        # Dopo aver decodificato il token:
+        role = payload.get("role")
+        if role is not None:
+            # Si potrebbe usare questo ruolo per autorizzazioni preliminari
+            # prima di recuperare l'intero record utente
+            pass  # Oppure implementare l'autorizzazione preliminare
+
+        if user_id is None:  # Fuori dal blocco condizionale precedente
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -122,6 +129,26 @@ async def get_current_editor_user(current_user: User = Depends(get_current_user)
         )
     return current_user
 
+def permission_required(permission: str):
+    """
+    Decorator per richiedere un permesso specifico.
+    
+    Args:
+        permission (str): Permesso richiesto
+    """
+    async def permission_dependency(current_user: User = Depends(get_current_user)):
+        has_permission = await check_permission(current_user, permission)
+        
+        if not has_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permesso richiesto: {permission}"
+            )
+        
+        return current_user
+    
+    return Depends(permission_dependency)
+
 async def check_permission(
     current_user: User,
     required_permission: str
@@ -144,27 +171,7 @@ async def check_permission(
     }
     
     # Ottieni permessi in base al ruolo
-    user_role = current_user.role.value
+    user_role = current_user.role.value.lower()
     user_permissions = role_permissions.get(user_role, [])
     
     return required_permission in user_permissions
-
-def permission_required(permission: str):
-    """
-    Decorator per richiedere un permesso specifico.
-    
-    Args:
-        permission (str): Permesso richiesto
-    """
-    async def permission_dependency(current_user: User = Depends(get_current_user)):
-        has_permission = await check_permission(current_user, permission)
-        
-        if not has_permission:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permesso richiesto: {permission}"
-            )
-        
-        return current_user
-    
-    return Depends(permission_dependency)
