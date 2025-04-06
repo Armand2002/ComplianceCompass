@@ -24,46 +24,182 @@ Piattaforma wiki collaborativa per semplificare la comprensione delle normative 
 
 - Docker e Docker Compose
 - Git
+- 4GB RAM minimo (8GB raccomandati)
+- 20GB di spazio disco disponibile
 
-### Setup Sviluppo
+### Ambiente di Sviluppo
 
-1. Clona il repository:
+1. **Clona il repository**
    ```bash
    git clone https://github.com/username/compliance-compass.git
    cd compliance-compass
    ```
 
-2. Crea il file `.env` basandoti su `.env.example`:
+2. **Crea il file di configurazione ambientale**
    ```bash
    cp .env.example .env
    ```
 
-3. Configura le variabili d'ambiente nel file `.env` secondo le tue necessità.
+3. **Personalizza la configurazione (opzionale)**
+   
+   Modifica il file `.env` per configurare:
+   - Credenziali database
+   - Chiavi JWT
+   - Parametri di connessione Elasticsearch
+   - Configurazione email
 
-4. Avvia i container di sviluppo:
+4. **Avvio Rapido**
+
+   Utilizza lo script automatico per Windows:
    ```bash
+   run.bat
+   ```
+
+   Oppure, per Linux/Mac:
+   ```bash
+   chmod +x run.sh
+   ./run.sh
+   ```
+
+5. **Avvio Manuale**
+   ```bash
+   docker-compose build
    docker-compose up -d
    ```
 
-5. L'API sarà disponibile su: http://localhost:8000
-   Documentazione API: http://localhost:8000/api/docs
-   Frontend: http://localhost:3000
-
-### Setup Produzione
-
-1. Configura le variabili d'ambiente:
+6. **Verifica lo stato dei servizi**
    ```bash
+   docker-compose ps
+   ```
+
+7. **Popola il database con dati iniziali**
+   ```bash
+   docker-compose exec api python -m scripts.seed_db
+   ```
+
+8. **Accedi all'applicazione**
+   - Frontend: http://localhost:3000
+   - API: http://localhost:8000
+   - Documentazione API: http://localhost:8000/api/docs
+
+### Ambiente di Produzione
+
+1. **Clona e configura**
+   ```bash
+   git clone https://github.com/username/compliance-compass.git
+   cd compliance-compass
    cp .env.example .env.prod
    ```
 
-2. Modifica il file `.env.prod` con le configurazioni di produzione.
+2. **Configura le impostazioni di produzione**
+   
+   Modifica `.env.prod` per impostare:
+   - `ENVIRONMENT=production`
+   - `DEBUG=False`
+   - Credenziali sicure per database e servizi
+   - URL frontend definitivo
+   - Configurazione SMTP valida
 
-3. Avvia con Docker Compose per produzione:
+3. **Prepara i certificati TLS (solo produzione)**
    ```bash
-   docker-compose -f docker/docker-compose.prod.yml --env-file .env.prod up -d
+   mkdir -p docker/nginx/certs
+   # Copia i tuoi certificati o configura Let's Encrypt
    ```
 
-4. Configura il tuo server DNS per puntare al tuo server e aggiorna la configurazione NGINX nel file `docker/nginx/nginx.conf`.
+4. **Costruisci e avvia i container di produzione**
+   ```bash
+   docker-compose -f docker-compose-prod.yml --env-file .env.prod up -d
+   ```
+
+5. **Verifica il funzionamento**
+   ```bash
+   docker-compose -f docker-compose-prod.yml logs -f
+   ```
+
+6. Configura il tuo server DNS per puntare al tuo server e aggiorna la configurazione NGINX nel file `docker/nginx/nginx.conf`.
+
+## 🔧 Comandi Utili
+
+### Gestione Container
+
+```bash
+# Ferma i container
+docker-compose down
+
+# Riavvia un servizio specifico
+docker-compose restart api
+
+# Visualizza logs in tempo reale
+docker-compose logs -f
+```
+
+### Manutenzione Database
+
+```bash
+# Accedi al database PostgreSQL
+docker-compose exec db psql -U postgres -d compliance_compass
+
+# Esegui migrazione del database
+docker-compose exec api alembic upgrade head
+
+# Backup del database
+docker-compose exec db pg_dump -U postgres compliance_compass > backup.sql
+```
+
+### Indicizzazione Elasticsearch
+
+```bash
+# Ricostruisci gli indici
+curl -X POST http://localhost:8000/api/search/reindex
+
+# Verifica stato Elasticsearch
+curl http://localhost:9200/_cluster/health
+```
+
+## 🔍 Troubleshooting
+
+### Problema: I container non si avviano
+
+1. Verifica che le porte non siano in uso:
+   ```bash
+   netstat -tuln | grep '5432\|8000\|3000\|9200'
+   ```
+
+2. Controlla i log di errore:
+   ```bash
+   docker-compose logs api
+   ```
+
+### Problema: Elasticsearch non si connette
+
+1. Verifica che Elasticsearch sia in esecuzione:
+   ```bash
+   docker-compose ps elasticsearch
+   ```
+
+2. Inizializza manualmente gli indici:
+   ```bash
+   curl -X POST http://localhost:8000/api/admin/elasticsearch/setup
+   ```
+
+### Problema: Dati mancanti
+
+Esegui lo script di seeding con opzioni specifiche:
+```bash
+docker-compose exec api python -m scripts.seed_db --admin-only
+```
+
+### Test dopo l'installazione
+
+Verifica che tutto funzioni correttamente:
+
+```bash
+# Test dell'API
+curl http://localhost:8000/api/health
+
+# Test di login (sostituisci con credenziali reali)
+curl -X POST http://localhost:8000/api/auth/login -H "Content-Type: application/json" -d '{"username":"admin", "password":"admin123"}'
+```
 
 ## 📊 Struttura del Progetto
 
@@ -123,6 +259,41 @@ curl -X POST http://localhost:8000/api/search/reindex
 4. Push al branch: `git push origin feature-nome`
 5. Apri una Pull Request
 
+## 📝 Architettura di Sistema
+
+### Componenti Principali
+
+- **Backend**: FastAPI con architettura MVC
+- **Database**: PostgreSQL con ORM SQLAlchemy
+- **Indicizzazione**: Elasticsearch per ricerca avanzata
+- **Autenticazione**: JWT con gestione ruoli e permessi
+- **Caching**: Sistema di caching avanzato per ottimizzazione delle prestazioni
+
+### Principali Funzionalità
+
+- Gestione centralizzata dei Privacy Patterns
+- Ricerca semantica avanzata
+- Supporto multi-lingue
+- Integrazione con standard GDPR e Privacy by Design
+- Chatbot intelligente per assistenza
+
+## 🔒 Sicurezza
+
+- Autenticazione basata su JWT
+- Protezione contro attacchi brute-force
+- Gestione granulare dei permessi
+- Crittografia delle password
+- Middleware di sicurezza personalizzati
+- Gestione dei rate limit
+
 ## 📄 Licenza
 
 Questo progetto è distribuito sotto licenza MIT. Vedi il file `LICENSE` per maggiori dettagli.
+
+## 📧 Contatti
+
+Per supporto, bug o suggerimenti:
+- Email: support@compliancecompass.com
+- GitHub Issues: [Link al repository]
+
+**Nota**: Questo progetto è in fase di sviluppo. Le funzionalità e l'architettura sono soggette a modifiche.
