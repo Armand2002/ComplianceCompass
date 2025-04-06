@@ -12,7 +12,7 @@ from src.models.vulnerability import Vulnerability
 from src.models.user_model import User
 from src.models.implementation_example import ImplementationExample
 from src.schemas.privacy_pattern import PatternCreate, PatternUpdate
-from src.utils.cache import cached
+from src.utils.cache import cached, invalidate_pattern_cache
 
 class PatternController:
     """
@@ -256,6 +256,9 @@ class PatternController:
         db.commit()
         db.refresh(db_pattern)
         
+        # Invalida cache
+        invalidate_pattern_cache(pattern_id)
+        
         return db_pattern
     
     @staticmethod
@@ -293,6 +296,9 @@ class PatternController:
         # Elimina il pattern
         db.delete(db_pattern)
         db.commit()
+        
+        # Invalida cache
+        invalidate_pattern_cache(pattern_id)
         
         return True
     

@@ -7,6 +7,7 @@ from sqlalchemy import or_
 
 from src.config import settings
 from src.models.privacy_pattern import PrivacyPattern
+from src.utils.circuit_breaker import circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +210,7 @@ class SearchService:
             logger.error(f"Errore nella rimozione del pattern {pattern_id} dall'indice: {str(e)}")
             return False
     
+    @circuit_breaker("elasticsearch_search", fallback_function=lambda *args, **kwargs: {"total": 0, "results": []})
     def search_patterns(
         self, 
         query: Optional[str] = None,

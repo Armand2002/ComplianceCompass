@@ -1,6 +1,6 @@
 # src/main.py
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -18,12 +18,10 @@ from src.middleware.error_handler import register_exception_handlers
 from starlette.middleware import CSRFMiddleware
 from src.logging_config import configure_logging
 from src.middleware.response_formatter import ResponseFormatterMiddleware
-
-# Configura logging con impostazioni dall'environment
-configure_logging(
-    log_level='DEBUG' if settings.DEBUG else 'INFO',
-    log_dir=settings.LOG_DIR if hasattr(settings, 'LOG_DIR') else None
-)
+from src.middleware.logging_middleware import RequestLoggingMiddleware
+from src.middleware.security import SecurityHeadersMiddleware, BruteForceProtectionMiddleware
+from src.models.user_model import User
+from src.auth.dependencies import get_current_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +32,30 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="Compliance Compass API",
     description="""
+    # Compliance Compass API
+    
     API per la piattaforma Compliance Compass che fornisce accesso a:
     
-    * Privacy Patterns
-    * Articoli GDPR
-    * Principi Privacy by Design
-    * Fasi ISO
-    * Vulnerabilità
+    * **Privacy Patterns**: Soluzioni riutilizzabili per implementare privacy nei sistemi
+    * **Articoli GDPR**: Accesso dettagliato agli articoli del Regolamento GDPR
+    * **Principi Privacy by Design**: Pattern correlati ai principi di Privacy by Design
+    * **Fasi di Design ISO 9241-210**: Mappatura con standard di progettazione UX
+    * **Vulnerabilità CWE**: Collegamento con vulnerabilità di sicurezza note
+    * **Raccomandazioni OWASP**: Best practice di sicurezza applicativa
     
-    Questa API supporta operazioni CRUD complete per tutte le entità.
+    ## Caratteristiche Principali
+    
+    - **Ricerca avanzata**: Ricerca full-text con filtri per articoli, principi e fasi
+    - **Gestione utenti**: Autenticazione e autorizzazione granulare
+    - **Notifiche**: Sistema di notifiche in tempo reale
+    - **Chatbot**: Assistente virtuale integrato
+    
+    ## Sicurezza
+    
+    Tutte le richieste devono essere autenticate tramite token JWT ottenuti dalla rotta `/api/auth/login`.
+    Token di refresh sono disponibili per mantenere la sessione senza richiedere nuovi login.
+    
+    Per problemi o assistenza, contattare il team di supporto.
     """,
     version=settings.APP_VERSION,
     docs_url="/api/docs" if not settings.ENVIRONMENT == "production" else None,
@@ -58,25 +71,26 @@ app = FastAPI(
         },
         {
             "name": "ricerca",
-            "description": "Funzionalità di ricerca avanzata"
+            "description": "Funzionalità di ricerca avanzata con filtri multidimensionali"
         },
         {
             "name": "notifiche",
-            "description": "Gestione delle notifiche"
+            "description": "Gestione delle notifiche push e sottoscrizioni"
         },
         {
             "name": "chatbot",
-            "description": "Interazione con l'assistente virtuale"
+            "description": "Interazione con l'assistente virtuale per domande su privacy e conformità"
         },
         {
             "name": "monitoraggio",
-            "description": "Endpoint per monitoring e health check"
+            "description": "Endpoint per health check e metriche del sistema"
         }
     ],
     openapi_url="/api/openapi.json",
     contact={
         "name": "Team Compliance Compass",
-        "email": "support@compliancecompass.example.com"
+        "email": "support@compliancecompass.example.com",
+        "url": "https://github.com/username/compliance-compass"
     },
     license_info={
         "name": "MIT",
@@ -84,9 +98,12 @@ app = FastAPI(
     },
     swagger_ui_parameters={
         "defaultModelsExpandDepth": -1,  # Hide schemas section by default
-        "displayRequestDuration": True,
         "docExpansion": "none",
-        "filter": True
+        "filter": True,
+        "operationsSorter": "alpha",
+        "tagsSorter": "alpha",
+        "tryItOutEnabled": True,
+        "persistAuthorization": True
     }
 )
 
@@ -120,22 +137,33 @@ app.add_middleware(
 )
 
 # Middleware per logging delle richieste
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """
-    Middleware per loggare le richieste in entrata e i tempi di risposta.
-    """
-    start_time = datetime.utcnow()
-    response = await call_next(request)
-    process_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-    
-    logger.info(
-        f"{request.method} {request.url.path} - "
-        f"Status: {response.status_code} - "
-        f"Process time: {process_time:.2f}ms"
-    )
-    
-    return response
+app.add_middleware(
+    RequestLoggingMiddleware,
+    exclude_paths=["/api/health", "/api/health/liveness", "/api/health/readiness"],
+    log_request_body=False
+)
+
+# Aggiungi nuovi middleware di sicurezza
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    content_security_policy=None,  # Usa default
+    enable_hsts=settings.ENVIRONMENT == "production"
+)
+
+app.add_middleware(
+    BruteForceProtectionMiddleware,
+    login_paths=["/api/auth/login"],
+    max_attempts=5,
+    lockout_time=1800  # 30 minuti
+)
+
+# Middleware di protezione SQL Injection solo in produzione
+if settings.ENVIRONMENT == "production":
+   from src.middleware.security import SQLInjectionProtectionMiddleware
+   app.add_middleware(
+       SQLInjectionProtectionMiddleware,
+       enabled=True
+   )
 
 # Registra gli handler per le eccezioni
 register_exception_handlers(app)
@@ -157,6 +185,16 @@ async def root():
         "api": "/api"
     }
 
+# Endpoint per il monitoraggio delle query lente
+@app.get("/api/admin/performance/db-queries", include_in_schema=False)
+async def get_db_performance(current_user: User = Depends(get_current_admin_user)):
+    """
+    Get database query performance report.
+    Restricted to admin users.
+    """
+    from src.middleware.query_monitor import get_slow_queries_report
+    return get_slow_queries_report()
+
 # Inizializzazione app
 @app.on_event("startup")
 async def startup_event():
@@ -165,10 +203,21 @@ async def startup_event():
     
     Inizializza il database e altre risorse.
     """
+    # Configura il logging con impostazioni dall'environment
+    configure_logging(
+        log_level='DEBUG' if settings.DEBUG else 'INFO',
+        environment=settings.ENVIRONMENT,
+        service_name='compliance-compass'
+    )
+    
     logger.info(f"Avvio applicazione {settings.APP_NAME} in ambiente {settings.ENVIRONMENT}")
     
     # Inizializza database
     init_db()
+    
+    # Inizializza il monitoraggio delle query
+    from src.middleware.query_monitor import init_query_monitoring
+    init_query_monitoring()
     
     # Inizializza Elasticsearch
     try:
