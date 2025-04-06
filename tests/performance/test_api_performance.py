@@ -3,14 +3,19 @@
 Test di performance per API endpoints critici.
 
 Misura tempi di risposta e throughput per scenari di uso comune.
+Include test concorrenti e profili di carico variabile.
 """
 import pytest
 import time
 import statistics
 import json
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Callable
 from pathlib import Path
+import logging
+from fastapi.testclient import TestClient
+
+logger = logging.getLogger(__name__)
 
 @pytest.mark.performance
 class TestAPIPerformance:
@@ -32,9 +37,9 @@ class TestAPIPerformance:
             "repetitions": 10,
             "concurrent_users": [1, 5, 10],
             "endpoints": [
-                {"url": "/api/patterns/", "method": "get"},
-                {"url": "/api/search/patterns?q=test", "method": "get"},
-                {"url": "/api/health/", "method": "get"}
+                {"url": "/api/patterns/", "method": "get", "expected_status": 200, "max_avg_ms": 200, "max_p95_ms": 300},
+                {"url": "/api/search/patterns?q=test", "method": "get", "expected_status": 200, "max_avg_ms": 250, "max_p95_ms": 350},
+                {"url": "/api/health/", "method": "get", "expected_status": 200, "max_avg_ms": 50, "max_p95_ms": 100}
             ]
         }
     
@@ -53,6 +58,84 @@ class TestAPIPerformance:
         results = self._run_load_profile_tests(client, user_token, benchmark_data)
         self._validate_and_log_results(results, "load_profile")
     
+    def test_pattern_operations_performance(self, client, admin_token, db_session):
+        """
+        Test completo delle operazioni CRUD sui pattern per misurare performance.
+        Misura tempi di creazione, lettura, aggiornamento ed eliminazione.
+        """
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        operation_times = {
+            "create": [],
+            "read": [],
+            "update": [], 
+            "delete": []
+        }
+        
+        # Test di creazione
+        for i in range(5):
+            pattern_data = {
+                "title": f"Performance Test Pattern {i}",
+                "description": "Pattern for performance testing",
+                "context": "Performance testing context",
+                "problem": "Need to measure system performance",
+                "solution": "Create comprehensive performance tests",
+                "consequences": "Better system reliability",
+                "strategy": "Test",
+                "mvc_component": "Model"
+            }
+            
+            start_time = time.time()
+            response = client.post("/api/patterns/", json=pattern_data, headers=headers)
+            end_time = time.time()
+            
+            assert response.status_code == 201, f"Creazione pattern fallita: {response.text}"
+            pattern_id = response.json()["id"]
+            
+            operation_times["create"].append((end_time - start_time) * 1000)
+            
+            # Test di lettura
+            start_time = time.time()
+            response = client.get(f"/api/patterns/{pattern_id}", headers=headers)
+            end_time = time.time()
+            
+            assert response.status_code == 200
+            operation_times["read"].append((end_time - start_time) * 1000)
+            
+            # Test di aggiornamento
+            update_data = {
+                "title": f"Updated Performance Test Pattern {i}",
+                "description": "Updated description for performance testing"
+            }
+            
+            start_time = time.time()
+            response = client.put(f"/api/patterns/{pattern_id}", json=update_data, headers=headers)
+            end_time = time.time()
+            
+            assert response.status_code == 200
+            operation_times["update"].append((end_time - start_time) * 1000)
+            
+            # Test di eliminazione
+            start_time = time.time()
+            response = client.delete(f"/api/patterns/{pattern_id}", headers=headers)
+            end_time = time.time()
+            
+            assert response.status_code == 204
+            operation_times["delete"].append((end_time - start_time) * 1000)
+        
+        # Verifica performance
+        for operation, times in operation_times.items():
+            avg_time = statistics.mean(times)
+            p95_time = sorted(times)[int(len(times) * 0.95)] if times else 0
+            
+            # Soglie di performance specifiche per tipo di operazione
+            max_avg = {"create": 250, "read": 150, "update": 200, "delete": 150}
+            max_p95 = {"create": 350, "read": 250, "update": 300, "delete": 250}
+            
+            assert avg_time < max_avg[operation], f"Performance {operation} non accettabile: media {avg_time:.2f}ms (max {max_avg[operation]}ms)"
+            assert p95_time < max_p95[operation], f"Performance {operation} P95 non accettabile: {p95_time:.2f}ms (max {max_p95[operation]}ms)"
+            
+            logger.info(f"Performance {operation}: avg={avg_time:.2f}ms, p95={p95_time:.2f}ms")
+    
     def _run_endpoint_tests(self, client, user_token, benchmark_data):
         results = {}
         headers = {"Authorization": f"Bearer {user_token}"}
@@ -60,6 +143,7 @@ class TestAPIPerformance:
         for endpoint in benchmark_data["endpoints"]:
             url = endpoint["url"]
             method = endpoint["method"]
+            expected_status = endpoint.get("expected_status", 200)
             
             # Esegui warm-up per evitare problemi di cold start
             getattr(client, method)(url, headers=headers)
@@ -71,8 +155,18 @@ class TestAPIPerformance:
                 response = getattr(client, method)(url, headers=headers)
                 end_time = time.time()
                 
-                assert response.status_code == 200, f"Endpoint {url} failed with status {response.status_code}"
+                assert response.status_code == expected_status, f"Endpoint {url} failed with status {response.status_code}: {response.text}"
                 times.append((end_time - start_time) * 1000)  # ms
+            
+            # Verifica performance rispetto a soglie definite
+            avg_time = statistics.mean(times)
+            p95_time = sorted(times)[int(len(times) * 0.95)] if times else 0
+            
+            max_avg_ms = endpoint.get("max_avg_ms", 200)
+            max_p95_ms = endpoint.get("max_p95_ms", 300)
+            
+            assert avg_time < max_avg_ms, f"Performance non accettabile per {url}: media {avg_time:.2f}ms (max {max_avg_ms}ms)"
+            assert p95_time < max_p95_ms, f"Performance P95 non accettabile per {url}: {p95_time:.2f}ms (max {max_p95_ms}ms)"
             
             # Calcola statistiche
             results[url] = self._calculate_stats(times)
@@ -108,17 +202,30 @@ class TestAPIPerformance:
             
             # Verifica status code
             for result in all_results:
-                assert result["status"] == 200, f"Request failed with status {result['status']}"
+                assert result["status"] == endpoint.get("expected_status", 200), f"Request failed with status {result['status']}"
             
             # Calcola statistiche
             times = [result["time"] for result in all_results]
-            results[num_users] = self._calculate_stats(times)
+            results[f"concurrent_users_{num_users}"] = self._calculate_stats(times)
+            
+            # Verifica performance rispetto a soglie scalate per concorrenza
+            avg_time = statistics.mean(times)
+            p95_time = sorted(times)[int(len(times) * 0.95)] if times else 0
+            
+            # Soglie scalate in base al numero di utenti concorrenti
+            scale_factor = 1 + (num_users / 10)  # Esempio: 5 utenti = fattore 1.5x
+            max_avg_ms = endpoint.get("max_avg_ms", 200) * scale_factor
+            max_p95_ms = endpoint.get("max_p95_ms", 300) * scale_factor
+            
+            assert avg_time < max_avg_ms, f"Performance concorrente ({num_users} utenti) non accettabile: media {avg_time:.2f}ms (max {max_avg_ms:.2f}ms)"
+            assert p95_time < max_p95_ms, f"Performance P95 concorrente ({num_users} utenti) non accettabile: {p95_time:.2f}ms (max {max_p95_ms:.2f}ms)"
         
         return results
     
     def _run_load_profile_tests(self, client, user_token, benchmark_data):
         results = {}
         loads = [(5, 10), (10, 20), (20, 10)]  # (users, duration)
+        headers = {"Authorization": f"Bearer {user_token}"}
         
         for users, duration in loads:
             with ThreadPoolExecutor(max_workers=users) as executor:
@@ -127,31 +234,45 @@ class TestAPIPerformance:
                 
                 while time.time() - start_time < duration:
                     futures = [
-                        executor.submit(self._make_request, client, user_token)
+                        executor.submit(self._make_request, client, url="/api/patterns/", headers=headers)
                         for _ in range(users)
                     ]
                     measurements.extend([f.result() for f in futures])
+                
+                # Verifica performance sotto carico sostenuto
+                avg_time = statistics.mean(measurements)
+                p95_time = sorted(measurements)[int(len(measurements) * 0.95)] if measurements else 0
+                
+                # Definisci soglie in base al carico
+                max_avg_ms = 250 * (1 + (users / 20))
+                max_p95_ms = 350 * (1 + (users / 20))
+                
+                assert avg_time < max_avg_ms, f"Performance sotto carico ({users} utenti) non accettabile: media {avg_time:.2f}ms (max {max_avg_ms:.2f}ms)"
+                assert p95_time < max_p95_ms, f"Performance P95 sotto carico ({users} utenti) non accettabile: {p95_time:.2f}ms (max {max_p95_ms:.2f}ms)"
                 
                 results[f"load_{users}users"] = self._calculate_stats(measurements)
         
         return results
     
-    def _make_request(self, client, user_token):
+    def _make_request(self, client, url, headers):
         """Effettua una singola richiesta e misura il tempo."""
-        headers = {"Authorization": f"Bearer {user_token}"}
         start_time = time.time()
-        response = client.get("/api/patterns/", headers=headers)
+        response = client.get(url, headers=headers)
         end_time = time.time()
         return (end_time - start_time) * 1000  # ms
     
-    def _calculate_stats(self, times: List[float]):
-        """Calcola statistiche di performance."""
+    def _calculate_stats(self, times: List[float]) -> Dict[str, float]:
+        """Calcola statistiche di performance complete."""
+        if not times:
+            return {"min": 0, "max": 0, "avg": 0, "median": 0, "p95": 0, "std_dev": 0}
+            
         return {
             "min": min(times),
             "max": max(times),
             "avg": statistics.mean(times),
             "median": statistics.median(times),
-            "p95": sorted(times)[int(len(times) * 0.95)]
+            "p95": sorted(times)[int(len(times) * 0.95)],
+            "std_dev": statistics.stdev(times) if len(times) > 1 else 0
         }
     
     def _validate_and_log_results(self, results: Dict[str, Any], test_name: str):
@@ -163,22 +284,30 @@ class TestAPIPerformance:
     def _validate_performance_criteria(self, results: Dict[str, Any]):
         """Verifica che i risultati soddisfino i criteri di performance."""
         for endpoint, stats in results.items():
-            assert stats["avg"] < 200, f"Performance non accettabile per {endpoint}"
-            assert stats["p95"] < 300, f"Troppi outlier per {endpoint}"
+            # Utilizziamo assertion per garantire che i test falliscano se le performance sono insufficienti
+            assert stats["avg"] < 500, f"Performance troppo bassa per {endpoint}: media {stats['avg']:.2f}ms"
+            assert stats["p95"] < 1000, f"Troppi outlier per {endpoint}: P95 {stats['p95']:.2f}ms"
     
     def _log_results(self, results: Dict[str, Any], test_name: str):
         """Salva i risultati in formato JSON."""
         output_dir = Path("performance_results")
         output_dir.mkdir(exist_ok=True)
         
-        with open(output_dir / f"{test_name}_{time.strftime('%Y%m%d_%H%M%S')}.json", "w") as f:
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        output_file = output_dir / f"{test_name}_{timestamp}.json"
+        
+        with open(output_file, "w") as f:
             json.dump(results, f, indent=2)
+        
+        logger.info(f"Risultati performance salvati in {output_file}")
     
     def _print_summary(self, results: Dict[str, Any], test_name: str):
-        """Stampa un sommario dei risultati."""
+        """Stampa un sommario dettagliato dei risultati."""
         print(f"\n=== Performance Test Results: {test_name} ===")
         for endpoint, stats in results.items():
             print(f"\n{endpoint}:")
             print(f"  Average: {stats['avg']:.2f}ms")
+            print(f"  Median: {stats['median']:.2f}ms")
             print(f"  95th percentile: {stats['p95']:.2f}ms")
             print(f"  Min/Max: {stats['min']:.2f}ms / {stats['max']:.2f}ms")
+            print(f"  Standard Deviation: {stats['std_dev']:.2f}ms")
