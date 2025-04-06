@@ -25,6 +25,10 @@ import SearchPage from './pages/search/SearchPage';
 import ChatbotPage from './pages/chatbot/ChatbotPage';
 import UserProfilePage from './pages/profile/UserProfile';
 
+// Newsletter components
+import NewsletterVerification from './components/newsletter/NewsletterVerification';
+import ManageSubscription from './components/newsletter/ManageSubscription';
+
 // Componente per le rotte protette
 import ProtectedRoute from './utils/ProtectedRoute';
 
@@ -58,6 +62,10 @@ const App = () => {
                   <Route path="/chatbot" element={<ChatbotPage />} />
                   <Route path="/profile" element={<UserProfilePage />} />
                 </Route>
+                
+                {/* Newsletter routes */}
+                <Route path="/newsletter/verify" element={<NewsletterVerification />} />
+                <Route path="/newsletter/manage" element={<ManageSubscription />} />
                 
                 {/* Pagina 404 */}
                 <Route path="*" element={<NotFoundPage />} />

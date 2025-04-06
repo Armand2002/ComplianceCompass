@@ -34,6 +34,7 @@ class User(Base):
     # Relazioni
     created_patterns = relationship("PrivacyPattern", back_populates="created_by")
     notifications = relationship("Notification", back_populates="user")
+    newsletter_issues = relationship("NewsletterIssue", back_populates="created_by")
     
     @property
     def is_admin(self):

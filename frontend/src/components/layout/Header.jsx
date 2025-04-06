@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FaBars, FaBell, FaUser, FaSearch, FaSignOutAlt } from 'react-icons/fa';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { FaBars, FaBell, FaUser, FaSearch, FaSignOutAlt, FaEnvelope } from 'react-icons/fa';
 import { AuthContext } from '../../context/AuthContext';
 
 const Header = ({ toggleSidebar, user }) => {
@@ -98,4 +98,29 @@ const Header = ({ toggleSidebar, user }) => {
   );
 };
 
-export default Header;
+const Sidebar = () => {
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        {/* ... existing header ... */}
+      </div>
+      <nav className="sidebar-nav">
+        <ul>
+          {/* ... existing menu items ... */}
+          
+          <li>
+            <NavLink 
+              to="/newsletter/manage" 
+              className={({ isActive }) => isActive ? 'active' : ''}
+            >
+              <FaEnvelope className="icon" />
+              <span>Gestisci Newsletter</span>
+            </NavLink>
+          </li>
+        </ul>
+      </nav>
+    </aside>
+  );
+};
+
+export { Header, Sidebar };

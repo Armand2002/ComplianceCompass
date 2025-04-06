@@ -21,6 +21,7 @@ from src.models.iso_phase import ISOPhase
 from src.models.vulnerability import Vulnerability
 from src.models.implementation_example import ImplementationExample
 from src.models.notification import Notification
+from src.models.newsletter import NewsletterSubscription, NewsletterIssue  
 
 # Import della configurazione
 from src.config import settings

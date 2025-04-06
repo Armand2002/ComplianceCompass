@@ -1,6 +1,6 @@
 # src/main.py
 import uvicorn
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -8,6 +8,7 @@ from datetime import datetime
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from typing import Dict, Any
 
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
@@ -22,6 +23,11 @@ from src.middleware.logging_middleware import RequestLoggingMiddleware
 from src.middleware.security import SecurityHeadersMiddleware, BruteForceProtectionMiddleware
 from src.models.user_model import User
 from src.auth.dependencies import get_current_admin_user
+from src.routes import newsletter_routes
+from src.schemas.newsletter import NewsletterSubscriptionCreate
+from src.controllers.newsletter_controller import newsletter_controller
+from sqlalchemy.orm import Session
+from src.auth.dependencies import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +90,10 @@ app = FastAPI(
         {
             "name": "monitoraggio",
             "description": "Endpoint per health check e metriche del sistema"
+        },
+        {
+            "name": "newsletter",
+            "description": "Operazioni relative alla newsletter"
         }
     ],
     openapi_url="/api/openapi.json",
@@ -171,6 +181,9 @@ register_exception_handlers(app)
 # Includi router API
 app.include_router(api_router)
 
+# Aggiungi le routes della newsletter
+app.include_router(newsletter_routes.router, prefix="/api")
+
 # Route principale
 @app.get("/")
 async def root():
@@ -194,6 +207,28 @@ async def get_db_performance(current_user: User = Depends(get_current_admin_user
     """
     from src.middleware.query_monitor import get_slow_queries_report
     return get_slow_queries_report()
+
+# Endpoint per iscrizione alla newsletter
+@newsletter_routes.router.post("/subscribe", status_code=status.HTTP_201_CREATED, response_model=Dict[str, Any])
+async def subscribe_newsletter(
+    subscription: NewsletterSubscriptionCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Iscrive un utente alla newsletter.
+    
+    - **email**: L'indirizzo email da iscrivere
+    
+    Returns:
+        - **message**: Messaggio di esito dell'operazione
+        - **requires_verification**: Se è richiesta la verifica dell'email
+        - **already_subscribed**: Se l'email è già iscritta (opzionale)
+    
+    Esempi:
+        - Iscrizione nuova email: `{"message": "Iscrizione creata. Email di verifica inviata.", "requires_verification": true}`
+        - Email già iscritta: `{"message": "Email già iscritta alla newsletter", "already_subscribed": true}`
+    """
+    return newsletter_controller.subscribe(db, subscription.email)
 
 # Inizializzazione app
 @app.on_event("startup")
