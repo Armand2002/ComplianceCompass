@@ -1,0 +1,148 @@
+# azure-pipelines.yml
+trigger:
+  - main
+  - feature/*
+
+pr:
+  - main
+
+variables:
+  python.version: '3.11'
+  PYTHONPATH: $(System.DefaultWorkingDirectory)
+
+stages:
+  - stage: UnitTest
+    displayName: 'Unit Tests'
+    jobs:
+      - job: RunUnitTests
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+              addToPath: true
+            displayName: 'Use Python $(python.version)'
+          
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-test.txt
+            displayName: 'Install dependencies'
+          
+          - script: |
+              pytest tests/unit/ --junitxml=test-results.xml --cov=src --cov-report=xml --cov-report=html --cov-fail-under=90
+            displayName: 'Run unit tests'
+          
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'test-results.xml'
+              testRunTitle: 'Unit Tests'
+            displayName: 'Publish test results'
+          
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/htmlcov'
+            displayName: 'Publish coverage report'
+
+  - stage: IntegrationTest
+    displayName: 'Integration Tests'
+    dependsOn: UnitTest
+    jobs:
+      - job: RunIntegrationTests
+        pool:
+          vmImage: 'ubuntu-latest'
+        services:
+          postgres:
+            image: postgres:14
+            ports:
+              - 5432:5432
+            env:
+              POSTGRES_USER: postgres
+              POSTGRES_PASSWORD: postgres
+              POSTGRES_DB: test_compliance_compass
+          elasticsearch:
+            image: elasticsearch:7.17.7
+            ports:
+              - 9200:9200
+            env:
+              discovery.type: single-node
+              ES_JAVA_OPTS: -Xms512m -Xmx512m
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+              addToPath: true
+            displayName: 'Use Python $(python.version)'
+          
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-test.txt
+            displayName: 'Install dependencies'
+          
+          - script: |
+              export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_compliance_compass"
+              export ELASTICSEARCH_URL="http://localhost:9200"
+              pytest tests/integration/ --junitxml=integration-results.xml
+            displayName: 'Run integration tests'
+          
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'integration-results.xml'
+              testRunTitle: 'Integration Tests'
+            displayName: 'Publish integration test results'
+
+  - stage: PerfTest
+    displayName: 'Performance Tests'
+    dependsOn: IntegrationTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: RunPerfTests
+        pool:
+          vmImage: 'ubuntu-latest'
+        services:
+          postgres:
+            image: postgres:14
+            ports:
+              - 5432:5432
+            env:
+              POSTGRES_USER: postgres
+              POSTGRES_PASSWORD: postgres
+              POSTGRES_DB: test_compliance_compass
+          elasticsearch:
+            image: elasticsearch:7.17.7
+            ports:
+              - 9200:9200
+            env:
+              discovery.type: single-node
+              ES_JAVA_OPTS: -Xms512m -Xmx512m
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+              addToPath: true
+            displayName: 'Use Python $(python.version)'
+          
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-test.txt
+            displayName: 'Install dependencies'
+          
+          - script: |
+              export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/test_compliance_compass"
+              export ELASTICSEARCH_URL="http://localhost:9200"
+              pytest tests/performance/ --run-performance --junitxml=perf-results.xml
+            displayName: 'Run performance tests'
+          
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'perf-results.xml'
+              testRunTitle: 'Performance Tests'
+            displayName: 'Publish performance test results'

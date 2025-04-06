@@ -1,223 +1,186 @@
 # tests/unit/test_auth_middleware.py
+"""
+Test unitari per middleware di autenticazione e autorizzazione.
+
+Verifica dettagliata di tutti i casi d'uso di autenticazione
+e controlli di autorizzazione.
+"""
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi import HTTPException
-from datetime import datetime
+from unittest.mock import AsyncMock, patch, MagicMock
+import jwt
+from datetime import datetime, timedelta
 
 from src.middleware.auth_middleware import (
     get_current_user,
     get_current_active_user,
     get_current_admin_user,
     get_current_editor_user,
+    permission_required,
     check_permission
 )
 from src.models.user_model import User, UserRole
+from src.config import settings
 
-
-class TestAuthMiddleware:
-    """Test per le funzioni di middleware di autenticazione."""
+@pytest.mark.parametrize("user_active,expected_success", [
+    (True, True),
+    (False, False)
+])
+@pytest.mark.asyncio
+async def test_get_current_active_user(user_active, expected_success):
+    """Verifica che get_current_active_user consideri attivazione."""
+    # Prepara utente mock
+    mock_user = MagicMock(spec=User)
+    mock_user.is_active = user_active
     
-    @pytest.mark.asyncio
-    async def test_get_current_user_valid_token(self, db, test_user):
-        """Verifica che get_current_user restituisca l'utente con token valido."""
-        # Arrange
-        valid_token = "valid.token.string"
-        
-        # Act
-        with patch("src.middleware.auth_middleware.decode_token") as mock_decode:
-            # Mock della decodifica token
-            mock_decode.return_value = {"sub": test_user.id}
-            
-            result = await get_current_user(valid_token, db)
-        
-        # Assert
-        assert result is not None
-        assert result.id == test_user.id
-        assert result.email == test_user.email
-    
-    @pytest.mark.asyncio
-    async def test_get_current_user_invalid_token(self, db):
-        """Verifica che get_current_user sollevi un'eccezione con token non valido."""
-        # Arrange
-        invalid_token = "invalid.token.string"
-        
-        # Act & Assert
-        with patch("src.middleware.auth_middleware.decode_token") as mock_decode:
-            # Simula un errore di decodifica
-            mock_decode.side_effect = Exception("Invalid token")
-            
-            with pytest.raises(HTTPException) as excinfo:
-                await get_current_user(invalid_token, db)
-            
-            assert excinfo.value.status_code == 401
-            assert "Credenziali non valide" in excinfo.value.detail
-    
-    @pytest.mark.asyncio
-    async def test_get_current_user_nonexistent_user(self, db):
-        """Verifica che get_current_user sollevi un'eccezione con user_id inesistente."""
-        # Arrange
-        valid_token = "valid.token.string"
-        nonexistent_id = 9999  # ID utente che non esiste
-        
-        # Act & Assert
-        with patch("src.middleware.auth_middleware.decode_token") as mock_decode:
-            # Mock della decodifica token
-            mock_decode.return_value = {"sub": nonexistent_id}
-            
-            with pytest.raises(HTTPException) as excinfo:
-                await get_current_user(valid_token, db)
-            
-            assert excinfo.value.status_code == 401
-            assert "Credenziali non valide" in excinfo.value.detail
-    
-    @pytest.mark.asyncio
-    async def test_get_current_user_inactive_user(self, db, test_user):
-        """Verifica che get_current_user sollevi un'eccezione con utente inattivo."""
-        # Arrange
-        valid_token = "valid.token.string"
-        
-        # Disattiva l'utente
-        test_user.is_active = False
-        db.commit()
-        
-        # Act & Assert
-        with patch("src.middleware.auth_middleware.decode_token") as mock_decode:
-            # Mock della decodifica token
-            mock_decode.return_value = {"sub": test_user.id}
-            
-            with pytest.raises(HTTPException) as excinfo:
-                await get_current_user(valid_token, db)
-            
-            assert excinfo.value.status_code == 403
-            assert "Utente disattivato" in excinfo.value.detail
-        
-        # Ripristina lo stato attivo per altri test
-        test_user.is_active = True
-        db.commit()
-    
-    @pytest.mark.asyncio
-    async def test_get_current_active_user_active(self):
-        """Verifica che get_current_active_user passi con utente attivo."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_active = True
-        
-        # Act
+    if expected_success:
+        # Dovrebbe passare se l'utente è attivo
         result = await get_current_active_user(mock_user)
-        
-        # Assert
         assert result == mock_user
-    
-    @pytest.mark.asyncio
-    async def test_get_current_active_user_inactive(self):
-        """Verifica che get_current_active_user sollevi un'eccezione con utente inattivo."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_active = False
-        
-        # Act & Assert
+    else:
+        # Dovrebbe fallire se l'utente non è attivo
         with pytest.raises(HTTPException) as excinfo:
             await get_current_active_user(mock_user)
-        
         assert excinfo.value.status_code == 403
         assert "Utente disattivato" in excinfo.value.detail
+
+@pytest.mark.parametrize("user_role,expected_success", [
+    (UserRole.ADMIN, True),
+    (UserRole.EDITOR, False),
+    (UserRole.VIEWER, False)
+])
+@pytest.mark.asyncio
+async def test_get_current_admin_user(user_role, expected_success):
+    """Verifica che get_current_admin_user permetta solo admin."""
+    # Prepara utente mock
+    mock_user = MagicMock(spec=User)
+    mock_user.role = user_role
+    mock_user.is_admin = user_role == UserRole.ADMIN
     
-    @pytest.mark.asyncio
-    async def test_get_current_admin_user_admin(self):
-        """Verifica che get_current_admin_user passi con admin."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_admin = True
-        
-        # Act
+    if expected_success:
+        # Dovrebbe passare se l'utente è admin
         result = await get_current_admin_user(mock_user)
-        
-        # Assert
         assert result == mock_user
-    
-    @pytest.mark.asyncio
-    async def test_get_current_admin_user_non_admin(self):
-        """Verifica che get_current_admin_user sollevi un'eccezione con non-admin."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_admin = False
-        
-        # Act & Assert
+    else:
+        # Dovrebbe fallire se l'utente non è admin
         with pytest.raises(HTTPException) as excinfo:
             await get_current_admin_user(mock_user)
-        
         assert excinfo.value.status_code == 403
         assert "Accesso riservato agli amministratori" in excinfo.value.detail
+
+@pytest.mark.parametrize("user_role,expected_success", [
+    (UserRole.ADMIN, True),
+    (UserRole.EDITOR, True),
+    (UserRole.VIEWER, False)
+])
+@pytest.mark.asyncio
+async def test_get_current_editor_user(user_role, expected_success):
+    """Verifica che get_current_editor_user permetta admin ed editor."""
+    # Prepara utente mock
+    mock_user = MagicMock(spec=User)
+    mock_user.role = user_role
+    mock_user.is_editor = user_role in [UserRole.ADMIN, UserRole.EDITOR]
     
-    @pytest.mark.asyncio
-    async def test_get_current_editor_user_editor(self):
-        """Verifica che get_current_editor_user passi con editor."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_editor = True
-        
-        # Act
+    if expected_success:
+        # Dovrebbe passare se l'utente è admin o editor
         result = await get_current_editor_user(mock_user)
-        
-        # Assert
         assert result == mock_user
-    
-    @pytest.mark.asyncio
-    async def test_get_current_editor_user_non_editor(self):
-        """Verifica che get_current_editor_user sollevi un'eccezione con non-editor."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.is_editor = False
-        
-        # Act & Assert
+    else:
+        # Dovrebbe fallire se l'utente non è né admin né editor
         with pytest.raises(HTTPException) as excinfo:
             await get_current_editor_user(mock_user)
-        
         assert excinfo.value.status_code == 403
         assert "Accesso riservato agli editor" in excinfo.value.detail
+
+@pytest.mark.parametrize("role_permission", indirect=True)
+@pytest.mark.asyncio
+async def test_check_permission(role_permission):
+    """Verifica check_permission per varie combinazioni ruolo-permesso."""
+    role, permission, expected = role_permission
     
-    @pytest.mark.asyncio
-    async def test_check_permission_admin_all_perms(self):
-        """Verifica che check_permission restituisca True per admin con qualsiasi permesso."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.role = UserRole.ADMIN
-        
-        # Act & Assert
-        for perm in ["read", "write", "delete", "admin"]:
-            result = await check_permission(mock_user, perm)
-            assert result is True
+    # Prepara utente mock
+    mock_user = MagicMock(spec=User)
+    mock_user.role = role
     
-    @pytest.mark.asyncio
-    async def test_check_permission_editor_limited_perms(self):
-        """Verifica che check_permission funzioni correttamente per editor."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.role = UserRole.EDITOR
-        
-        # Act & Assert
-        # Permessi che dovrebbero essere True
-        for perm in ["read", "write", "delete"]:
-            result = await check_permission(mock_user, perm)
-            assert result is True
-        
-        # Permessi che dovrebbero essere False
-        result = await check_permission(mock_user, "admin")
-        assert result is False
+    # Verifica permesso
+    result = await check_permission(mock_user, permission)
+    assert result is expected
+
+@pytest.mark.asyncio
+async def test_get_current_user_valid_token(db_session, mocker):
+    """Verifica che get_current_user restituisca utente con token valido."""
+    # Mock per decode_token
+    mock_decode = mocker.patch('src.middleware.auth_middleware.decode_token')
+    mock_decode.return_value = {"sub": "1", "role": "admin"}
     
-    @pytest.mark.asyncio
-    async def test_check_permission_viewer_read_only(self):
-        """Verifica che check_permission funzioni correttamente per viewer."""
-        # Arrange
-        mock_user = MagicMock()
-        mock_user.role = UserRole.VIEWER
-        
-        # Act & Assert
-        # Permesso che dovrebbe essere True
-        result = await check_permission(mock_user, "read")
-        assert result is True
-        
-        # Permessi che dovrebbero essere False
-        for perm in ["write", "delete", "admin"]:
-            result = await check_permission(mock_user, perm)
-            assert result is False
+    # Mock per query database
+    mock_user = mocker.MagicMock(spec=User)
+    mock_user.id = 1
+    mock_user.is_active = True
+    
+    mock_query = mocker.MagicMock()
+    mock_query.filter.return_value.first.return_value = mock_user
+    mocker.patch.object(db_session, 'query', return_value=mock_query)
+    
+    # Esegui funzione da testare
+    result = await get_current_user("valid_token", db_session)
+    
+    # Verifica risultato
+    assert result == mock_user
+    mock_decode.assert_called_once_with("valid_token")
+    mock_query.filter.assert_called_once()
+    assert mock_user.last_login is not None
+
+@pytest.mark.asyncio
+async def test_get_current_user_invalid_token(db_session, mocker):
+    """Verifica che get_current_user sollevi eccezione con token non valido."""
+    # Mock per decode_token che solleva eccezione
+    mock_decode = mocker.patch('src.middleware.auth_middleware.decode_token')
+    mock_decode.side_effect = jwt.JWTError("Invalid token")
+    
+    # Esegui funzione da testare
+    with pytest.raises(HTTPException) as excinfo:
+        await get_current_user("invalid_token", db_session)
+    
+    # Verifica eccezione
+    assert excinfo.value.status_code == 401
+    assert "Credenziali non valide" in excinfo.value.detail
+    mock_decode.assert_called_once_with("invalid_token")
+
+@pytest.mark.asyncio
+async def test_get_current_user_missing_sub(db_session, mocker):
+    """Verifica che get_current_user gestisca token senza 'sub'."""
+    # Mock per decode_token
+    mock_decode = mocker.patch('src.middleware.auth_middleware.decode_token')
+    mock_decode.return_value = {"role": "admin"}  # Manca 'sub'
+    
+    # Esegui funzione da testare
+    with pytest.raises(HTTPException) as excinfo:
+        await get_current_user("incomplete_token", db_session)
+    
+    # Verifica eccezione
+    assert excinfo.value.status_code == 401
+    assert "Credenziali non valide" in excinfo.value.detail
+    mock_decode.assert_called_once_with("incomplete_token")
+
+@pytest.mark.asyncio
+async def test_get_current_user_nonexistent_user(db_session, mocker):
+    """Verifica che get_current_user gestisca utente inesistente."""
+    # Mock per decode_token
+    mock_decode = mocker.patch('src.middleware.auth_middleware.decode_token')
+    mock_decode.return_value = {"sub": "999", "role": "admin"}
+    
+    # Mock per query database che non trova utenti
+    mock_query = mocker.MagicMock()
+    mock_query.filter.return_value.first.return_value = None
+    mocker.patch.object(db_session, 'query', return_value=mock_query)
+    
+    # Esegui funzione da testare
+    with pytest.raises(HTTPException) as excinfo:
+        await get_current_user("valid_token", db_session)
+    
+    # Verifica eccezione
+    assert excinfo.value.status_code == 401
+    assert "Credenziali non valide" in excinfo.value.detail
+    mock_decode.assert_called_once_with("valid_token")
+    mock_query.filter.assert_called_once()
