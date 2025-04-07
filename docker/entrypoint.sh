@@ -25,11 +25,33 @@ check_service() {
     fi
 }
 
+# Estrai parametri dal DATABASE_URL o usa valori predefiniti
+if [ -n "$DATABASE_URL" ]; then
+    # Estrai host e porta dal DATABASE_URL 
+    DB_HOST=$(echo $DATABASE_URL | sed -e 's/^.*@\(.*\):.*/\1/')
+    DB_PORT=$(echo $DATABASE_URL | sed -e 's/^.*:\([0-9]*\)\/.*/\1/')
+else
+    # Valori predefiniti
+    DB_HOST="db"
+    DB_PORT="5432"
+fi
+
 # Attendi disponibilità database
-check_service "PostgreSQL" "db" "5432" "30" || exit 1
+check_service "PostgreSQL" "$DB_HOST" "$DB_PORT" "30" || exit 1
+
+# Estrai parametri Elasticsearch o usa valori predefiniti
+if [ -n "$ELASTICSEARCH_URL" ]; then
+    # Estrai host e porta dall'ELASTICSEARCH_URL
+    ES_HOST=$(echo $ELASTICSEARCH_URL | sed -e 's|^http://\(.*\):.*|\1|')
+    ES_PORT=$(echo $ELASTICSEARCH_URL | sed -e 's|^http://.*:\(.*\)$|\1|')
+else
+    # Valori predefiniti
+    ES_HOST="elasticsearch"
+    ES_PORT="9200"
+fi
 
 # Attendi disponibilità elasticsearch (con gestione errori)
-if ! check_service "Elasticsearch" "elasticsearch" "9200" "30"; then
+if ! check_service "Elasticsearch" "$ES_HOST" "$ES_PORT" "30"; then
     echo "AVVISO: Elasticsearch non disponibile, proseguo con funzionalità limitate."
 fi
 

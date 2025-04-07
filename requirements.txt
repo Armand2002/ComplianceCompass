@@ -19,7 +19,7 @@ fastapi-csrf-protect==0.3.3
 itsdangerous==2.1.2
 
 # Elasticsearch
-elasticsearch==8.9.0
+elasticsearch==7.17.7
 
 # Chatbot e NLP
 nltk==3.8.1
