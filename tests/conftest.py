@@ -1,4 +1,3 @@
-# tests/conftest.py
 """
 Configurazione centralizzata per i test di Compliance Compass.
 
@@ -51,20 +50,10 @@ def pytest_addoption(parser):
         default=False,
         help="Usa database mock invece di un database reale"
     )
-    parser.addoption(
-        "--use-mock-es", 
-        action="store_true", 
-        default=True,
-        help="Usa Elasticsearch mock invece di un'istanza reale"
-    )
 
 @pytest.fixture(scope="session")
 def use_mock_db(request):
     return request.config.getoption("--use-mock-db")
-
-@pytest.fixture(scope="session")
-def use_mock_es(request):
-    return request.config.getoption("--use-mock-es")
 
 # Fixture per il motore DB di test
 @pytest.fixture(scope="session")
@@ -258,45 +247,17 @@ def expired_token(test_user) -> str:
     expires = timedelta(minutes=-10)  # Scaduto 10 minuti fa
     return create_access_token(data={"sub": str(test_user.id)}, expires_delta=expires)
 
-# Fixture per simulare Elasticsearch
+# Fixture per il servizio di ricerca
 @pytest.fixture
-def mock_elasticsearch(use_mock_es):
+def search_service():
     """
-    Fornisce un mock per Elasticsearch.
+    Fornisce un'istanza del servizio di ricerca SQL per i test.
     
     Returns:
-        MagicMock: Mock di Elasticsearch
+        SearchService: Un'istanza del servizio di ricerca
     """
-    if use_mock_es:
-        with patch("src.services.search_service.Elasticsearch") as mock_es:
-            # Configura il mock per simulare comportamenti di Elasticsearch
-            mock_instance = MagicMock()
-            mock_instance.ping.return_value = True
-            mock_instance.indices.exists.return_value = True
-            mock_instance.search.return_value = {
-                "hits": {
-                    "total": {"value": 1},
-                    "hits": [
-                        {
-                            "_source": {
-                                "id": 1,
-                                "title": "Mock Pattern",
-                                "description": "This is a mocked pattern",
-                                "strategy": "Mock",
-                                "mvc_component": "Model"
-                            },
-                            "_score": 1.0
-                        }
-                    ]
-                }
-            }
-            mock_es.return_value = mock_instance
-            yield mock_instance
-    else:
-        # Usa una vera istanza Elasticsearch
-        from elasticsearch import Elasticsearch
-        es = Elasticsearch(hosts=["http://localhost:9200"])
-        yield es
+    from src.services.search_service import SearchService
+    return SearchService()
 
 # Fixture per dati di test
 @pytest.fixture

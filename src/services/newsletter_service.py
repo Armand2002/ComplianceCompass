@@ -5,15 +5,16 @@ Implementa le funzionalità per gestire iscrizioni alla newsletter,
 gestione dei template e invio delle campagne newsletter.
 """
 import logging
+import secrets
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import uuid
 
-from src.models.newsletter import NewsletterSubscriber, NewsletterCampaign, NewsletterDelivery
+from src.models.newsletter import NewsletterSubscription, NewsletterIssue
 from src.services.email_service import EmailService
-from src.exceptions.service_exceptions import ServiceUnavailableException, ResourceNotFoundException
+from src.exceptions import ServiceUnavailableException, ResourceNotFoundException
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,19 @@ class NewsletterService:
         Iscrive un utente alla newsletter.
         
         Args:
+            db: Sessione database
+            email: Email dell'utente da iscrivere
+            first_name: Nome dell'utente (opzionale)
+            last_name: Cognome dell'utente (opzionale)
+            preferences: Preferenze dell'utente (opzionale)
+            
+        Returns:
+            Dizionario con esito dell'operazione
+        """
+        try:
+            # Verifica se l'email esiste già
+            existing = db.query(NewsletterSubscription).filter(
+                NewsletterSubscription.email == email
             ).first()
             
             if existing:
@@ -68,9 +82,13 @@ class NewsletterService:
             verification_token = secrets.token_urlsafe(32)
             subscription = NewsletterSubscription(
                 email=email,
+                first_name=first_name,
+                last_name=last_name,
                 verification_token=verification_token,
                 is_active=True,
-                is_verified=False
+                is_verified=False,
+                preferences=preferences,
+                subscribed_at=datetime.utcnow()
             )
             
             db.add(subscription)
@@ -318,7 +336,7 @@ class NewsletterService:
             Lista di iscrizioni attive
         """
         # Selezioniamo solo i campi necessari per l'invio delle newsletter
-        return db.query(NewsletterSubscription.id, NewsletterSubscription.email).filter(
+        return db.query(NewsletterSubscription).filter(
             NewsletterSubscription.is_active == True,
             NewsletterSubscription.is_verified == True
         ).offset(skip).limit(limit).all()
@@ -409,7 +427,9 @@ class NewsletterService:
                         template_data={
                             "content": issue.content,
                             "unsubscribe_url": f"/newsletter/unsubscribe?email={subscription.email}",
-                            "email": subscription.email
+                            "email": subscription.email,
+                            "subject": issue.subject,
+                            "current_year": datetime.now().year
                         }
                     )
                     
