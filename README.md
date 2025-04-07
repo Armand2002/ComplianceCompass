@@ -5,8 +5,8 @@ Piattaforma wiki collaborativa per semplificare la comprensione delle normative 
 ## 📋 Funzionalità Principali
 
 - **Repository centralizzato di normative**: Accesso unificato a GDPR, Privacy by Design e standard di sicurezza.
-- **Chatbot intelligente**: Assistente basato su NLP per risposte e suggerimenti.
-- **Ricerca avanzata**: Sistema di ricerca semantico con filtri multidimensionali.
+- **FAQ interattive**: Risposte immediate alle domande più frequenti.
+- **Ricerca avanzata**: Sistema di ricerca SQL ottimizzato con filtri multidimensionali.
 - **Privacy Pattern**: Collezione di soluzioni pratiche per implementare la privacy nei sistemi.
 - **Interfaccia moderna**: Design responsive e accessibile.
 
@@ -14,7 +14,6 @@ Piattaforma wiki collaborativa per semplificare la comprensione delle normative 
 
 - **Backend**: FastAPI (Python)
 - **Database**: PostgreSQL
-- **Search Engine**: Elasticsearch
 - **Frontend**: React.js
 - **Containerization**: Docker
 
@@ -162,7 +161,7 @@ curl http://localhost:9200/_cluster/health
 
 1. Verifica che le porte non siano in uso:
    ```bash
-   netstat -tuln | grep '5432\|8000\|3000\|9200'
+   netstat -tuln | grep '5432\|8000\|3000'
    ```
 
 2. Controlla i log di errore:

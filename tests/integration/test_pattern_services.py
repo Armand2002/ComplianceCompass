@@ -4,7 +4,6 @@ Test di integrazione per i servizi di gestione dei Privacy Patterns.
 
 Questi test verificano l'interazione tra:
 - Pattern Service
-- Elasticsearch Service
 - Database
 - Gestione delle eccezioni
 """
@@ -14,7 +13,6 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 
 from src.services.pattern_service import PatternService
-from src.services.elasticsearch_service import ElasticsearchService
 from src.exceptions import (
     DataIntegrityException, 
     ServiceUnavailableException
@@ -35,20 +33,12 @@ def db_session():
         session.close()
 
 @pytest.fixture(scope="module")
-def elasticsearch_service():
-    """
-    Fixture per il servizio Elasticsearch.
-    """
-    return ElasticsearchService()
-
-@pytest.fixture(scope="module")
-def pattern_service(db_session, elasticsearch_service):
+def pattern_service(db_session):
     """
     Fixture per il Pattern Service con dipendenze iniettate.
     """
     return PatternService(
-        db_session=db_session, 
-        elasticsearch_service=elasticsearch_service
+        db_session=db_session
     )
 
 class TestPatternServiceIntegration:
@@ -62,7 +52,6 @@ class TestPatternServiceIntegration:
         
         Verifica:
         - Creazione pattern nel database
-        - Indicizzazione in Elasticsearch
         - Recupero e validazione
         """
         # Dati di test per un pattern
@@ -90,18 +79,16 @@ class TestPatternServiceIntegration:
         assert retrieved_pattern is not None
         assert retrieved_pattern.title == pattern_data["title"]
     
-    def test_update_pattern_with_elasticsearch(
+    def test_update_pattern(
         self, 
         pattern_service, 
-        db_session, 
-        elasticsearch_service
+        db_session
     ):
         """
-        Test di aggiornamento pattern con verifica Elasticsearch.
+        Test di aggiornamento pattern.
         
         Verifica:
         - Aggiornamento pattern nel database
-        - Re-indicizzazione in Elasticsearch
         """
         # Crea un pattern di test
         initial_data = {
@@ -131,18 +118,16 @@ class TestPatternServiceIntegration:
         # Verifica che l'ID rimanga invariato
         assert updated_pattern.id == initial_pattern.id
     
-    def test_search_patterns_with_fallback(
+    def test_search_patterns(
         self, 
         pattern_service, 
-        db_session, 
-        elasticsearch_service
+        db_session
     ):
         """
-        Test di ricerca pattern con meccanismo di fallback.
+        Test di ricerca pattern.
         
         Verifica:
         - Ricerca con filtri multipli
-        - Funzionamento del fallback
         """
         # Crea alcuni pattern di test
         test_patterns = [
@@ -179,18 +164,16 @@ class TestPatternServiceIntegration:
             for pattern in search_results['patterns']
         )
     
-    def test_delete_pattern_with_elasticsearch(
+    def test_delete_pattern(
         self, 
         pattern_service, 
-        db_session, 
-        elasticsearch_service
+        db_session
     ):
         """
-        Test di eliminazione pattern con verifica Elasticsearch.
+        Test di eliminazione pattern.
         
         Verifica:
         - Eliminazione dal database
-        - Rimozione da Elasticsearch
         """
         # Crea un pattern di test
         pattern_data = {
@@ -231,33 +214,37 @@ class TestPatternServiceIntegration:
         non_existent_pattern = pattern_service.get_pattern_by_id(99999)
         assert non_existent_pattern is None
 
-def test_elasticsearch_fallback(
+def test_db_search(
     pattern_service, 
-    elasticsearch_service, 
     db_session
 ):
     """
-    Test del meccanismo di fallback Elasticsearch.
+    Test del meccanismo di ricerca database.
     
-    Verifica il comportamento quando Elasticsearch non è disponibile.
+    Verifica il comportamento della ricerca basata su SQL.
     """
-    # Simula indisponibilità di Elasticsearch
-    elasticsearch_service.is_available = False
-    
     # Crea un pattern
     pattern_data = {
-        "title": "Pattern Fallback",
-        "description": "Test del meccanismo di fallback",
-        "strategy": "Fallback",
+        "title": "SQL Search Pattern",
+        "description": "Test del meccanismo di ricerca SQL",
+        "strategy": "Search",
         "mvc_component": "Controller"
     }
     
-    # Verifica che la creazione funzioni anche senza Elasticsearch
+    # Crea il pattern
     created_pattern = pattern_service.create_pattern(pattern_data)
     
     # Verifica creazione nel database
     assert created_pattern is not None
-    assert created_pattern.title == "Pattern Fallback"
+    assert created_pattern.title == "SQL Search Pattern"
     
-    # Ripristina disponibilità Elasticsearch
-    elasticsearch_service.is_available = True
+    # Esegui una ricerca
+    results = pattern_service.search_service.search_patterns(
+        db=db_session,
+        query="SQL Search",
+        strategy="Search"
+    )
+    
+    # Verifica risultati
+    assert results["total"] >= 1
+    assert any(p["id"] == created_pattern.id for p in results["results"])

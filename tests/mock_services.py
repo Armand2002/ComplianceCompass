@@ -11,11 +11,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class MockElasticsearchService:
+class MockDatabaseSearchService:
     """
-    Servizio Elasticsearch simulato per testing.
+    Servizio di ricerca SQL simulato per testing.
     
-    Simula le principali operazioni di Elasticsearch 
+    Simula le principali operazioni di ricerca database
     senza dipendenze esterne.
     """
     
@@ -26,15 +26,13 @@ class MockElasticsearchService:
     
     def search(
         self, 
-        query: Dict[str, Any], 
-        fallback_method: Optional[Callable] = None
+        query: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Simula una ricerca Elasticsearch.
+        Simula una ricerca nel database.
         
         Args:
             query (Dict[str, Any]): Query di ricerca
-            fallback_method (Callable, optional): Metodo di fallback
         
         Returns:
             Dict[str, Any]: Risultati simulati
@@ -46,25 +44,21 @@ class MockElasticsearchService:
         ]
         
         results = {
-            "hits": {
-                "total": {"value": len(matching_docs)},
-                "hits": [{"_source": doc, "_id": doc_id} for doc_id, doc in 
-                        [(doc_id, self.documents[doc_id]) for doc_id in self.documents 
-                         if self._match_query(self.documents[doc_id], query)]]
-            }
+            "total": len(matching_docs),
+            "results": matching_docs
         }
         return results
     
-    def index_document(
+    def add_document(
         self, 
         document: Dict[str, Any], 
         doc_id: Optional[str] = None
     ) -> str:
         """
-        Simula l'indicizzazione di un documento.
+        Simula l'aggiunta di un documento.
         
         Args:
-            document (Dict[str, Any]): Documento da indicizzare
+            document (Dict[str, Any]): Documento da aggiungere
             doc_id (str, optional): ID documento
         
         Returns:
@@ -77,15 +71,15 @@ class MockElasticsearchService:
         self.documents[doc_id] = document
         return doc_id
     
-    def delete_document(self, doc_id: str) -> bool:
+    def remove_document(self, doc_id: str) -> bool:
         """
-        Simula l'eliminazione di un documento.
+        Simula la rimozione di un documento.
         
         Args:
             doc_id (str): ID del documento
         
         Returns:
-            bool: True se l'eliminazione è riuscita
+            bool: True se la rimozione è riuscita
         """
         if doc_id in self.documents:
             del self.documents[doc_id]
@@ -108,31 +102,25 @@ class MockElasticsearchService:
             return True
         
         try:
-            # Gestione query bool
-            if 'query' in query and 'bool' in query['query']:
-                bool_query = query['query']['bool']
-                
-                # Gestione must
-                if 'must' in bool_query:
-                    for item in bool_query['must']:
-                        if 'match' in item:
-                            for field, search_value in item['match'].items():
-                                if field not in document or search_value not in str(document[field]):
-                                    return False
-                
-                # Gestione filter
-                if 'filter' in bool_query:
-                    for item in bool_query['filter']:
-                        if 'term' in item:
-                            for field, value in item['term'].items():
-                                if field not in document or document[field] != value:
-                                    return False
+            # Gestione filtri
+            filters = query.get("filters", {})
+            for field, value in filters.items():
+                if field not in document or document[field] != value:
+                    return False
             
-            # Gestione query semplice
-            elif 'query' in query and 'match' in query['query']:
-                for field, search_value in query['query']['match'].items():
-                    if field not in document or search_value not in str(document[field]):
-                        return False
+            # Gestione ricerca testuale
+            search_term = query.get("search_term")
+            if search_term:
+                # Cerca in campi di testo comuni
+                text_fields = ["title", "description", "content"]
+                found = False
+                for field in text_fields:
+                    if field in document and search_term.lower() in str(document[field]).lower():
+                        found = True
+                        break
+                
+                if not found:
+                    return False
             
             return True
         except Exception as e:
