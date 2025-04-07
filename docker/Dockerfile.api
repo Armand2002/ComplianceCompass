@@ -89,7 +89,7 @@ datefmt = %%H:%%M:%%S" > /app/alembic.ini && chown appuser:appuser /app/alembic.
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
 
 # Copia lo script di entrypoint
-COPY docker/entrypoint.sh /app/entrypoint.sh
+COPY ./docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Cambia all'utente non-root
