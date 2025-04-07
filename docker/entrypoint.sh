@@ -1,49 +1,84 @@
 #!/bin/bash
-# docker/entrypoint.sh - Rimozione controllo Elasticsearch
+# Entrypoint script for Compliance Compass API
+
+# Exit on any error
 set -e
 
-# Funzione per verificare servizi
-check_service() {
-    local service=$1
-    local host=$2
-    local port=$3
-    local max_retries=$4
-    local retry_count=0
-    
-    echo "Verifica disponibilità di $service su $host:$port..."
-    while ! nc -z $host $port && [ $retry_count -lt $max_retries ]; do
-        retry_count=$((retry_count+1))
-        echo "$service non disponibile, attendo... ($retry_count/$max_retries)"
-        sleep 3
-    done
-    
-    if [ $retry_count -eq $max_retries ]; then
-        echo "ERRORE: $service non disponibile dopo $max_retries tentativi!"
-        return 1
-    else
-        echo "$service disponibile!"
-        return 0
-    fi
+# Print commands for debugging
+# set -x
+
+# Logging function
+log() {
+    echo "[ENTRYPOINT] $1"
 }
 
-# Estrai parametri dal DATABASE_URL o usa valori predefiniti
-if [ -n "$DATABASE_URL" ]; then
-    # Estrai host e porta dal DATABASE_URL 
-    DB_HOST=$(echo $DATABASE_URL | sed -e 's/^.*@\(.*\):.*/\1/')
-    DB_PORT=$(echo $DATABASE_URL | sed -e 's/^.*:\([0-9]*\)\/.*/\1/')
-else
-    # Valori predefiniti
-    DB_HOST="db"
-    DB_PORT="5432"
-fi
+# Wait for database to be ready
+wait_for_database() {
+    local host="${DB_HOST:-db}"
+    local port="${DB_PORT:-5432}"
+    local max_attempts=30
+    local attempt=1
 
-# Attendi disponibilità database
-check_service "PostgreSQL" "$DB_HOST" "$DB_PORT" "30" || exit 1
+    log "Waiting for database on $host:$port..."
 
-# Esegui migrazioni
-echo "Esecuzione migrazioni database..."
-alembic upgrade head
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z "$host" "$port"; then
+            log "Database is ready!"
+            return 0
+        fi
 
-# Avvia l'applicazione
-echo "Avvio applicazione..."
-exec "$@"
+        log "Waiting for database... (Attempt $attempt/$max_attempts)"
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+
+    log "Database connection failed after $max_attempts attempts"
+    return 1
+}
+
+# Run database migrations
+run_migrations() {
+    log "Running database migrations..."
+    alembic upgrade head
+}
+
+# Seed database
+seed_database() {
+    log "Seeding database..."
+    
+    # Determine seeding strategy based on environment
+    local seed_args=""
+    if [ "$ENVIRONMENT" = "production" ]; then
+        seed_args="--admin-only"
+    fi
+    
+    python -m scripts.seed_db $seed_args
+}
+
+# Main startup sequence
+main() {
+    # Set default environment if not set
+    export ENVIRONMENT="${ENVIRONMENT:-development}"
+    export DEBUG="${DEBUG:-true}"
+
+    # Wait for database
+    if ! wait_for_database; then
+        log "Could not connect to database. Exiting."
+        exit 1
+    fi
+
+    # Run migrations
+    run_migrations
+
+    # Seed database
+    seed_database
+
+    # Start the application
+    log "Starting Compliance Compass API..."
+    
+    # Use exec to replace the current process
+    exec uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+}
+
+# Call main with all script arguments
+main "$@"

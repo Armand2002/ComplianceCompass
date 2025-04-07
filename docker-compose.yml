@@ -1,60 +1,62 @@
-# docker-compose.yml - Rimozione del servizio Elasticsearch
-
 version: '3.8'
 
 services:
   api:
-    build:
+    build: 
       context: .
-      dockerfile: docker/Dockerfile.api
-    restart: unless-stopped
+      dockerfile: docker/Dockerfile.api  # Updated path to Dockerfile
+    container_name: compliance-compass-api
     volumes:
       - ./src:/app/src
       - ./alembic:/app/alembic
       - ./scripts:/app/scripts
+      - ./docker:/app/docker  # Mount docker directory to ensure entrypoint is accessible
     environment:
       - ENVIRONMENT=development
-      - DATABASE_URL=postgresql://postgres:password@db:5432/compliance_compass
-      - SECRET_KEY=your_secret_key
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/compliance_compass
+      - JWT_SECRET_KEY=your_secret_key
       - DEBUG=true
-      - USE_MOCK_ELASTICSEARCH=true
-      - USE_SIMPLE_CHATBOT=true
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
     ports:
       - "8000:8000"
     depends_on:
       - db
     networks:
-      - compliance-network
+      - compliance_compass_network
 
   db:
     image: postgres:14
-    restart: unless-stopped
+    container_name: compliance-compass-db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=compliance_compass
     ports:
       - "5432:5432"
     networks:
-      - compliance-network
+      - compliance_compass_network
 
   frontend:
-    image: nginx:alpine
-    restart: unless-stopped
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: compliance-compass-frontend
     volumes:
-      - ./frontend/build:/usr/share/nginx/html
-      - ./docker/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend:/app
+      - /app/node_modules  # Prevent overwriting node_modules
+    environment:
+      - NODE_OPTIONS=--openssl-legacy-provider  # For Node 16 compatibility
     ports:
-      - "80:80"
+      - "3000:3000"
+    networks:
+      - compliance_compass_network
     depends_on:
       - api
-    networks:
-      - compliance-network
 
 networks:
-  compliance-network:
+  compliance_compass_network:
     driver: bridge
 
 volumes:
