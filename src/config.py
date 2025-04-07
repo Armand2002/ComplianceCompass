@@ -69,6 +69,7 @@ class Settings(BaseSettings):
         """Configurazione del modello Settings."""
         case_sensitive = True
         env_file = ".env"
+        extra = "ignore"  # Ignora campi extra nel file .env
 
 # Istanza singleton delle impostazioni
 
