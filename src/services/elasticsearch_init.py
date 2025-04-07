@@ -194,6 +194,26 @@ class ElasticsearchInit:
             logger.error(f"Errore nell'indicizzazione dei pattern: {str(e)}")
             return False
     
+    def index_pattern(self, pattern: PrivacyPattern) -> bool:
+        """
+        Wrapper pubblico per indicizzare un singolo pattern.
+        
+        Args:
+            pattern (PrivacyPattern): Pattern da indicizzare
+            
+        Returns:
+            bool: True se l'operazione è riuscita, False altrimenti
+        """
+        if not self.connected:
+            logger.warning("Elasticsearch non disponibile. Impossibile indicizzare il pattern.")
+            return False
+            
+        try:
+            return self._index_pattern(pattern)
+        except Exception as e:
+            logger.error(f"Errore nell'indicizzazione del pattern {pattern.id}: {str(e)}")
+            return False
+    
     def _index_pattern(self, pattern: PrivacyPattern):
         """
         Indicizza un singolo pattern.

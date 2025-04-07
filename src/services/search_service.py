@@ -1,7 +1,13 @@
 # src/services/search_service.py
 import logging
 from typing import Dict, List, Any, Optional
-from elasticsearch import Elasticsearch, exceptions
+try:
+    from elasticsearch import Elasticsearch, exceptions
+    ELASTICSEARCH_AVAILABLE = True
+except ImportError:
+    ELASTICSEARCH_AVAILABLE = False
+    logging.warning("Modulo elasticsearch non disponibile, verranno usati mock per search_service")
+
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -19,7 +25,7 @@ class SearchService:
     """
     
     def __init__(self):
-        """Inizializza la connessione a Elasticsearch."""
+        # Normale inizializzazione con elasticsearch
         self.es = None
         self.index_name = "privacy_patterns"
         

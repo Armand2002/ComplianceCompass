@@ -9,6 +9,11 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from typing import Dict, Any
+from pydantic import BaseModel
+
+# Importazione fastapi-csrf-protect invece di CSRFMiddleware
+from fastapi_csrf_protect import CsrfProtect
+from fastapi_csrf_protect.exceptions import CsrfProtectError
 
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
@@ -16,7 +21,6 @@ from src.routes.api import api_router
 from src.db.init_db import init_db
 from src.services.elasticsearch_init import ElasticsearchInit
 from src.middleware.error_handler import register_exception_handlers
-from starlette.middleware import CSRFMiddleware
 from src.logging_config import configure_logging
 from src.middleware.response_formatter import ResponseFormatterMiddleware
 from src.middleware.logging_middleware import RequestLoggingMiddleware
@@ -34,7 +38,18 @@ logger = logging.getLogger(__name__)
 # Configurazione rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Crea applicazione FastAPI
+# Configurazione CSRF
+class CsrfSettings(BaseModel):
+    secret_key: str = settings.JWT_SECRET_KEY
+    cookie_secure: bool = False  # True in produzione
+    cookie_samesite: str = 'lax'
+    cookie_name: str = 'fastapi-csrf-token'
+
+@CsrfProtect.load_config
+def get_csrf_config():
+    return CsrfSettings()
+
+# Inizializzazione app
 app = FastAPI(
     title="Compliance Compass API",
     description="""
@@ -117,10 +132,7 @@ app = FastAPI(
     }
 )
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Configura CORS con supporto OPTIONS
+# Configurazione CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -129,60 +141,40 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Aggiungi il middleware per la formattazione delle risposte
-app.add_middleware(ResponseFormatterMiddleware)
+# Registrazione errori di rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Middleware per rate limiting
+# Registrazione dei middleware
+app.add_middleware(BruteForceProtectionMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ResponseFormatterMiddleware)
 app.add_middleware(
     RateLimitMiddleware,
     limit=settings.RATE_LIMIT_DEFAULT,
     interval=60
 )
 
-# Middleware per CSRF
-app.add_middleware(
-    CSRFMiddleware,
-    secret=settings.SECRET_KEY,
-    safe_methods=["GET", "HEAD", "OPTIONS"]
-)
+# Gestore eccezioni CSRF
+@app.exception_handler(CsrfProtectError)
+def csrf_protect_exception_handler(request: Request, exc: CsrfProtectError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message}
+    )
 
-# Middleware per logging delle richieste
-app.add_middleware(
-    RequestLoggingMiddleware,
-    exclude_paths=["/api/health", "/api/health/liveness", "/api/health/readiness"],
-    log_request_body=False
-)
-
-# Aggiungi nuovi middleware di sicurezza
-app.add_middleware(
-    SecurityHeadersMiddleware,
-    content_security_policy=None,  # Usa default
-    enable_hsts=settings.ENVIRONMENT == "production"
-)
-
-app.add_middleware(
-    BruteForceProtectionMiddleware,
-    login_paths=["/api/auth/login"],
-    max_attempts=5,
-    lockout_time=1800  # 30 minuti
-)
-
-# Middleware di protezione SQL Injection solo in produzione
-if settings.ENVIRONMENT == "production":
-   from src.middleware.security import SQLInjectionProtectionMiddleware
-   app.add_middleware(
-       SQLInjectionProtectionMiddleware,
-       enabled=True
-   )
-
-# Registra gli handler per le eccezioni
-register_exception_handlers(app)
-
-# Includi router API
+# Attivazione router
 app.include_router(api_router)
-
-# Aggiungi le routes della newsletter
 app.include_router(newsletter_routes.router, prefix="/api")
+
+# Endpoint per generare CSRF token
+@app.get("/api/csrf-token", tags=["Security"])
+async def get_csrf_token(csrf_protect: CsrfProtect = Depends()):
+    """Genera un nuovo token CSRF e lo imposta come cookie."""
+    response = JSONResponse(content={"detail": "CSRF token cookie set"})
+    csrf_protect.set_csrf_cookie(response)
+    return response
 
 # Route principale
 @app.get("/")
@@ -230,41 +222,35 @@ async def subscribe_newsletter(
     """
     return newsletter_controller.subscribe(db, subscription.email)
 
-# Inizializzazione app
+# Evento di startup
 @app.on_event("startup")
 async def startup_event():
-    """
-    Evento di avvio dell'applicazione.
+    logger.info(f"Avvio applicazione {settings.APP_NAME} in ambiente {settings.ENVIRONMENT}")
     
-    Inizializza il database e altre risorse.
-    """
+    # Inizializzazione database
+    try:
+        init_db()
+        logger.info("Database inizializzato con successo")
+    except Exception as e:
+        logger.error(f"Errore nell'inizializzazione del database: {e}")
+    
+    # Inizializzazione Elasticsearch
+    try:
+        es_init = ElasticsearchInit()
+        if es_init.connected:
+            es_init.setup_indices()
+            logger.info("Elasticsearch inizializzato con successo.")
+        else:
+            logger.warning("Elasticsearch non disponibile. Funzionalità di ricerca avanzata disabilitate.")
+    except Exception as e:
+        logger.error(f"Errore nell'inizializzazione di Elasticsearch: {e}")
+
     # Configura il logging con impostazioni dall'environment
     configure_logging(
         log_level='DEBUG' if settings.DEBUG else 'INFO',
         environment=settings.ENVIRONMENT,
         service_name='compliance-compass'
     )
-    
-    logger.info(f"Avvio applicazione {settings.APP_NAME} in ambiente {settings.ENVIRONMENT}")
-    
-    # Inizializza database
-    init_db()
-    
-    # Inizializza il monitoraggio delle query
-    from src.middleware.query_monitor import init_query_monitoring
-    init_query_monitoring()
-    
-    # Inizializza Elasticsearch
-    try:
-        es_init = ElasticsearchInit()
-        if es_init.connected:
-            # Setup indici Elasticsearch
-            es_init.setup_indices()
-            logger.info("Elasticsearch inizializzato con successo.")
-        else:
-            logger.warning("Elasticsearch non disponibile. Funzionalità di ricerca avanzata disabilitate.")
-    except Exception as e:
-        logger.error(f"Errore nell'inizializzazione di Elasticsearch: {str(e)}")
     
     logger.info("Applicazione avviata con successo")
 
@@ -277,7 +263,7 @@ async def shutdown_event():
     """
     logger.info("Spegnimento applicazione")
 
-# Esecuzione standalone
+# Se questo file viene eseguito direttamente
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",

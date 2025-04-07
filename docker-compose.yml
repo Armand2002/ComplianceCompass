@@ -1,27 +1,77 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:14
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=compliance_compass
-
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api.simplified
+      dockerfile: docker/api/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./:/app
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:password@db:5432/compliance_compass
+      - SECRET_KEY=your_secret_key
+      - DEBUG=true
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/compliance_compass
     depends_on:
       - db
+      - elasticsearch
+    networks:
+      - compliance-network
+
+  db:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=compliance_compass
+    ports:
+      - "5432:5432"
+    networks:
+      - compliance-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - compliance-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  frontend:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./frontend/build:/usr/share/nginx/html
+      - ./docker/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - compliance-network
+
+networks:
+  compliance-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  elasticsearch_data:
