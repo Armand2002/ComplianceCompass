@@ -1,56 +1,84 @@
-# src/models/newsletter.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Index
-from sqlalchemy.orm import relationship
+"""
+Modelli per la gestione delle newsletter.
+"""
+import uuid
 from datetime import datetime
+from typing import Optional, Dict, Any, List
+
+from sqlalchemy import Column, String, Boolean, DateTime, Text, JSON, ForeignKey, Integer
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+
 from src.models.base import Base
-from src.models.user_model import User
 
-class NewsletterSubscription(Base):
-    """
-    Modello per le iscrizioni alla newsletter.
-    
-    Memorizza informazioni sugli utenti iscritti alla newsletter.
-    """
-    __tablename__ = "newsletter_subscriptions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    is_active = Column(Boolean, default=True, index=True)  # Aggiunto indice
-    is_verified = Column(Boolean, default=False, index=True)  # Aggiunto indice
-    verification_token = Column(String(100), nullable=True)
-    subscribed_at = Column(DateTime, default=datetime.utcnow)
-    last_updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Associazione facoltativa con l'utente (se registrato)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-    user = relationship("User", backref="newsletter_subscription")
-    
-    # Aggiungiamo un indice composto per le query più frequenti
-    __table_args__ = (
-        Index('idx_active_verified', 'is_active', 'is_verified'),
-    )
-    
+
+class NewsletterSubscriber(Base):
+    """Modello per gli abbonati alla newsletter."""
+    __tablename__ = "newsletter_subscribers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    confirmation_token = Column(String(255), nullable=True, unique=True)
+    is_confirmed = Column(Boolean, nullable=False, default=False)
+    preferences = Column(JSON, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relazioni
+    deliveries = relationship("NewsletterDelivery", back_populates="subscriber", cascade="all, delete-orphan")
+
     def __repr__(self):
-        return f"<NewsletterSubscription(id={self.id}, email='{self.email}', is_verified={self.is_verified})>"
+        return f"<NewsletterSubscriber email={self.email}, active={self.is_active}, confirmed={self.is_confirmed}>"
 
 
-class NewsletterIssue(Base):
-    """
-    Modello per le edizioni della newsletter.
-    
-    Memorizza informazioni sulle newsletter inviate.
-    """
-    __tablename__ = "newsletter_issues"
-    
-    id = Column(Integer, primary_key=True, index=True)
+class NewsletterCampaign(Base):
+    """Modello per le campagne newsletter."""
+    __tablename__ = "newsletter_campaigns"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
     subject = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
+    content_html = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="draft")  # draft, scheduled, sent, cancelled
+    scheduled_at = Column(DateTime, nullable=True)
     sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    created_by_id = Column(Integer, ForeignKey('users.id'))
-    
+    target_segment = Column(JSON, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
     # Relazioni
+    deliveries = relationship("NewsletterDelivery", back_populates="campaign", cascade="all, delete-orphan")
     created_by = relationship("User")
-    
+
     def __repr__(self):
-        return f"<NewsletterIssue(id={self.id}, subject='{self.subject}')>"
+        return f"<NewsletterCampaign title={self.title}, status={self.status}>"
+
+
+class NewsletterDelivery(Base):
+    """Modello per tracciare l'invio delle newsletter."""
+    __tablename__ = "newsletter_deliveries"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id = Column(UUID(as_uuid=True), ForeignKey("newsletter_campaigns.id", ondelete="CASCADE"), nullable=False)
+    subscriber_id = Column(UUID(as_uuid=True), ForeignKey("newsletter_subscribers.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending, sent, delivered, opened, clicked, bounced, failed
+    sent_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    opened_at = Column(DateTime, nullable=True)
+    clicked_at = Column(DateTime, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relazioni
+    campaign = relationship("NewsletterCampaign", back_populates="deliveries")
+    subscriber = relationship("NewsletterSubscriber", back_populates="deliveries")
+
+    def __repr__(self):
+        return f"<NewsletterDelivery campaign={self.campaign_id}, subscriber={self.subscriber_id}, status={self.status}>"

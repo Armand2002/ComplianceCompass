@@ -1,41 +1,41 @@
-# src/services/newsletter_service.py
-from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from datetime import datetime
-import secrets
-import logging
+"""
+Servizio per la gestione delle newsletter.
 
-from src.models.newsletter import NewsletterSubscription, NewsletterIssue
+Implementa le funzionalità per gestire iscrizioni alla newsletter,
+gestione dei template e invio delle campagne newsletter.
+"""
+import logging
+from typing import List, Dict, Any, Optional, Union
+from datetime import datetime
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+import uuid
+
+from src.models.newsletter import NewsletterSubscriber, NewsletterCampaign, NewsletterDelivery
 from src.services.email_service import EmailService
+from src.exceptions.service_exceptions import ServiceUnavailableException, ResourceNotFoundException
 
 logger = logging.getLogger(__name__)
 
 class NewsletterService:
     """
-    Servizio per la gestione delle iscrizioni alla newsletter.
+    Servizio per la gestione delle newsletter.
     
-    Gestisce tutte le operazioni relative alle iscrizioni, invio email di verifica,
-    e gestione delle newsletter.
+    Gestisce iscrizioni, creazione e invio di campagne newsletter.
     """
+    
     def __init__(self):
+        """Inizializza il servizio newsletter."""
         self.email_service = EmailService()
     
-    def subscribe(self, db: Session, email: str) -> Dict[str, Any]:
+    # ================== Gestione Abbonati ==================
+    
+    def subscribe(self, db: Session, email: str, first_name: str = None, last_name: str = None, 
+                  preferences: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Iscrive un utente alla newsletter.
         
         Args:
-            db: Sessione database
-            email: Email dell'utente da iscrivere
-            
-        Returns:
-            Dizionario con informazioni sull'iscrizione e token di verifica
-        """
-        try:
-            # Verifica se l'email è già registrata
-            existing = db.query(NewsletterSubscription).filter(
-                NewsletterSubscription.email == email
             ).first()
             
             if existing:
