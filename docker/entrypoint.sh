@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Entrypoint script for Compliance Compass API
 
 # Exit on any error
