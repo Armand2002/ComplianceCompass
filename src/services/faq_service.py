@@ -113,3 +113,39 @@ class FAQService:
                 results.append(faq)
         
         return results
+        
+    def get_response_for_query(self, query: str) -> Dict[str, Any]:
+        """
+        Simula una risposta del chatbot cercando nella base FAQ.
+        
+        Args:
+            query (str): Query dell'utente
+            
+        Returns:
+            Dict[str, Any]: Risposta formattata
+        """
+        if not query:
+            return {
+                "response": "Come posso aiutarti? Puoi chiedermi informazioni sui Privacy Pattern, GDPR, o come utilizzare la piattaforma.",
+                "source": "faq",
+                "relevant_faqs": self.get_all_faqs()[:3]
+            }
+        
+        matching_faqs = self.search_faqs(query)
+        
+        if matching_faqs:
+            best_match = matching_faqs[0]
+            return {
+                "response": best_match["answer"],
+                "source": "faq",
+                "faq_id": best_match["id"],
+                "question": best_match["question"],
+                "relevant_faqs": matching_faqs[1:4] if len(matching_faqs) > 1 else []
+            }
+        else:
+            # Nessuna corrispondenza esatta, restituisci risposta generica
+            return {
+                "response": "Mi dispiace, non ho una risposta specifica per questa domanda. Prova a riformulare la tua richiesta o consulta le nostre FAQ per argomenti correlati.",
+                "source": "fallback",
+                "relevant_faqs": self.get_all_faqs()[:3]
+            }

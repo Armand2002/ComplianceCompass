@@ -1,4 +1,4 @@
-# src/routes/api.py - Rimozione del router chatbot e aggiunta del router FAQ
+# src/routes/api.py - Modificato per sostituire chatbot con FAQ
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse

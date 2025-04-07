@@ -1,4 +1,4 @@
-# src/main.py - Rimozione dell'inizializzazione di Elasticsearch e Chatbot
+# src/main.py - Modificato per rimuovere Elasticsearch e Chatbot
 
 import uvicorn
 from fastapi import FastAPI, Request, Depends, status
@@ -12,14 +12,14 @@ from slowapi.errors import RateLimitExceeded
 from typing import Dict, Any
 from pydantic import BaseModel
 
-# Importazione fastapi-csrf-protect invece di CSRFMiddleware
+# Importazione fastapi-csrf-protect
 from fastapi_csrf_protect import CsrfProtect
 from fastapi_csrf_protect.exceptions import CsrfProtectError
 
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
 from src.routes.api import api_router
-from src.routes.faq_routes import router as faq_router  # Nuovo import
+from src.routes.faq_routes import router as faq_router  # Nuovo import (FAQ invece di chatbot)
 from src.db.init_db import init_db
 from src.middleware.error_handler import register_exception_handlers
 from src.logging_config import configure_logging

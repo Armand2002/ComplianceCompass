@@ -1,4 +1,4 @@
-# src/services/search_service.py
+# src/services/search_service.py - Versione modificata
 """
 Servizio di ricerca basato su SQL come sostituto di Elasticsearch.
 """
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class SearchService:
     """
-    Servizio per la ricerca di Privacy Patterns mediante SQL.
-    Questa implementazione sostituisce completamente Elasticsearch.
+    Servizio per la ricerca di Privacy Patterns.
+    Questa implementazione sostituisce Elasticsearch con ricerca SQL.
     """
     
     def __init__(self):
@@ -27,8 +27,7 @@ class SearchService:
         Inizializza il servizio di ricerca.
         Nota: mantenuto es=None per compatibilità con il codice esistente.
         """
-        self.es = None
-        self.index_name = "privacy_patterns"  # Mantenuto per compatibilità
+        self.es = None  # Mantenuto per compatibilità, ma non usato
         logger.info("Inizializzato servizio di ricerca basato su SQL (senza Elasticsearch)")
     
     def search_patterns(
@@ -42,27 +41,40 @@ class SearchService:
         iso_id: Optional[int] = None,
         vulnerability_id: Optional[int] = None,
         from_pos: int = 0,
-        size: int = 10,
-        sort_by: str = "relevance"
+        size: int = 10
     ) -> Dict[str, Any]:
         """
-        Esegue una ricerca di Privacy Patterns usando query SQL ottimizzate.
-        
-        Args:
-            db (Session): Sessione database SQLAlchemy
-            query (str, optional): Query di ricerca testuale
-            strategy (str, optional): Filtra per strategia
-            mvc_component (str, optional): Filtra per componente MVC
-            gdpr_id (int, optional): Filtra per articolo GDPR
-            pbd_id (int, optional): Filtra per principio PbD
-            iso_id (int, optional): Filtra per fase ISO
-            vulnerability_id (int, optional): Filtra per vulnerabilità
-            from_pos (int): Posizione di partenza per la paginazione
-            size (int): Numero di risultati da restituire
-            sort_by (str): Campo di ordinamento
-            
-        Returns:
-            Dict[str, Any]: Risultati della ricerca
+        Implementazione di ricerca basata su SQL.
+        """
+        # Implementare qui la logica di ricerca con SQLAlchemy
+        return self._db_search_fallback(
+            db=db, 
+            query=query, 
+            strategy=strategy, 
+            mvc_component=mvc_component, 
+            gdpr_id=gdpr_id, 
+            pbd_id=pbd_id, 
+            iso_id=iso_id, 
+            vulnerability_id=vulnerability_id, 
+            from_pos=from_pos, 
+            size=size
+        )
+    
+    def _db_search_fallback(
+        self,
+        db: Session,
+        query: Optional[str] = None,
+        strategy: Optional[str] = None,
+        mvc_component: Optional[str] = None,
+        gdpr_id: Optional[int] = None,
+        pbd_id: Optional[int] = None,
+        iso_id: Optional[int] = None,
+        vulnerability_id: Optional[int] = None,
+        from_pos: int = 0,
+        size: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Ricerca pattern nel database usando SQLAlchemy.
         """
         try:
             # Costruzione della query base
@@ -117,15 +129,6 @@ class SearchService:
             # Assicurati che i risultati siano unici
             base_query = base_query.distinct()
             
-            # Ordinamento
-            if sort_by == "relevance" and query:
-                # In mancanza di full-text search, ordinamento per titolo
-                base_query = base_query.order_by(PrivacyPattern.title)
-            elif sort_by == "date":
-                base_query = base_query.order_by(PrivacyPattern.updated_at.desc())
-            else:
-                base_query = base_query.order_by(PrivacyPattern.title)
-            
             # Conteggio totale per paginazione
             total = base_query.count()
             
@@ -162,20 +165,10 @@ class SearchService:
         self, 
         db: Session,
         query: str,
-        limit: int = 10,
-        fields: List[str] = ["title", "description", "strategy"]
+        limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Ottiene suggerimenti di autocompletamento basati sul query utente.
-        
-        Args:
-            db (Session): Sessione database SQLAlchemy
-            query (str): Query utente parziale
-            limit (int): Numero massimo di suggerimenti
-            fields (List[str]): Campi su cui effettuare l'autocomplete
-            
-        Returns:
-            List[Dict[str, Any]]: Lista di suggerimenti
         """
         if not query or not db:
             return []
@@ -184,19 +177,13 @@ class SearchService:
             # Query SQL con LIKE per imitare autocomplete
             like_term = f"%{query}%"
             
-            if "title" in fields:
-                patterns = db.query(PrivacyPattern).filter(
-                    PrivacyPattern.title.ilike(like_term)
-                ).limit(limit).all()
-            else:
-                # Fallback generico
-                patterns = db.query(PrivacyPattern).filter(
-                    or_(
-                        PrivacyPattern.title.ilike(like_term),
-                        PrivacyPattern.description.ilike(like_term),
-                        PrivacyPattern.strategy.ilike(like_term)
-                    )
-                ).limit(limit).all()
+            patterns = db.query(PrivacyPattern).filter(
+                or_(
+                    PrivacyPattern.title.ilike(like_term),
+                    PrivacyPattern.description.ilike(like_term),
+                    PrivacyPattern.strategy.ilike(like_term)
+                )
+            ).limit(limit).all()
             
             suggestions = []
             for pattern in patterns:
