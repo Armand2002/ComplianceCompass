@@ -1,4 +1,5 @@
-# src/main.py
+# src/main.py - Rimozione dell'inizializzazione di Elasticsearch e Chatbot
+
 import uvicorn
 from fastapi import FastAPI, Request, Depends, status
 from fastapi.responses import JSONResponse
@@ -18,8 +19,8 @@ from fastapi_csrf_protect.exceptions import CsrfProtectError
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
 from src.routes.api import api_router
+from src.routes.faq_routes import router as faq_router  # Nuovo import
 from src.db.init_db import init_db
-from src.services.elasticsearch_init import ElasticsearchInit
 from src.middleware.error_handler import register_exception_handlers
 from src.logging_config import configure_logging
 from src.middleware.response_formatter import ResponseFormatterMiddleware
@@ -66,10 +67,10 @@ app = FastAPI(
     
     ## Caratteristiche Principali
     
-    - **Ricerca avanzata**: Ricerca full-text con filtri per articoli, principi e fasi
+    - **Ricerca avanzata**: Ricerca con filtri per articoli, principi e fasi
     - **Gestione utenti**: Autenticazione e autorizzazione granulare
     - **Notifiche**: Sistema di notifiche in tempo reale
-    - **Chatbot**: Assistente virtuale integrato
+    - **FAQ**: Assistenza con domande frequenti
     
     ## Sicurezza
     
@@ -99,8 +100,8 @@ app = FastAPI(
             "description": "Gestione delle notifiche push e sottoscrizioni"
         },
         {
-            "name": "chatbot",
-            "description": "Interazione con l'assistente virtuale per domande su privacy e conformità"
+            "name": "faq",
+            "description": "Domande frequenti e supporto"
         },
         {
             "name": "monitoraggio",
@@ -167,6 +168,7 @@ def csrf_protect_exception_handler(request: Request, exc: CsrfProtectError):
 # Attivazione router
 app.include_router(api_router)
 app.include_router(newsletter_routes.router, prefix="/api")
+app.include_router(faq_router, prefix="/api")  # Aggiunto FAQ router
 
 # Endpoint per generare CSRF token
 @app.get("/api/csrf-token", tags=["Security"])
@@ -189,16 +191,6 @@ async def root():
         "docs": "/api/docs",
         "api": "/api"
     }
-
-# Endpoint per il monitoraggio delle query lente
-@app.get("/api/admin/performance/db-queries", include_in_schema=False)
-async def get_db_performance(current_user: User = Depends(get_current_admin_user)):
-    """
-    Get database query performance report.
-    Restricted to admin users.
-    """
-    from src.middleware.query_monitor import get_slow_queries_report
-    return get_slow_queries_report()
 
 # Endpoint per iscrizione alla newsletter
 @newsletter_routes.router.post("/subscribe", status_code=status.HTTP_201_CREATED, response_model=Dict[str, Any])
@@ -234,17 +226,6 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Errore nell'inizializzazione del database: {e}")
     
-    # Inizializzazione Elasticsearch
-    try:
-        es_init = ElasticsearchInit()
-        if es_init.connected:
-            es_init.setup_indices()
-            logger.info("Elasticsearch inizializzato con successo.")
-        else:
-            logger.warning("Elasticsearch non disponibile. Funzionalità di ricerca avanzata disabilitate.")
-    except Exception as e:
-        logger.error(f"Errore nell'inizializzazione di Elasticsearch: {e}")
-
     # Configura il logging con impostazioni dall'environment
     configure_logging(
         log_level='DEBUG' if settings.DEBUG else 'INFO',

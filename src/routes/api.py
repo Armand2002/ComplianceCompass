@@ -1,4 +1,5 @@
-# src/routes/api.py
+# src/routes/api.py - Rimozione del router chatbot e aggiunta del router FAQ
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
@@ -8,7 +9,7 @@ from src.routes import (
     user_routes, 
     search_routes, 
     notification_routes, 
-    chatbot_routes,
+    faq_routes,       # Sostituito chatbot_routes con faq_routes
     health_routes
 )
 from src.middleware.auth_middleware import get_current_user
@@ -67,8 +68,8 @@ api_router.include_router(
 api_router.include_router(user_routes.router)
 api_router.include_router(search_routes.router)
 api_router.include_router(notification_routes.router)
-api_router.include_router(chatbot_routes.router)
-api_router.include_router(health_routes.router)  # Nuovo router per health check
+api_router.include_router(faq_routes.router)  # Sostituito chatbot_routes con faq_routes
+api_router.include_router(health_routes.router)
 
 @api_router.get("/", include_in_schema=False)
 async def api_root():

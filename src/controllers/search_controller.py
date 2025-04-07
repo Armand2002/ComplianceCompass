@@ -7,14 +7,12 @@ import logging
 from src.services.search_service import SearchService
 from src.models.privacy_pattern import PrivacyPattern
 
-# Crea un logger per questo modulo
 logger = logging.getLogger(__name__)
 
 class SearchController:
     """
     Controller per la gestione delle ricerche.
-    
-    Gestisce la logica di business per le ricerche.
+    Aggiornato per utilizzare la ricerca basata su SQL invece di Elasticsearch.
     """
     
     def __init__(self):
@@ -52,104 +50,19 @@ class SearchController:
         Returns:
             Dict[str, Any]: Risultati della ricerca
         """
-        if self.search_service.es:
-            # Utilizza Elasticsearch per la ricerca
-            result = self.search_service.search_patterns(
-                query=query,
-                strategy=strategy,
-                mvc_component=mvc_component,
-                gdpr_id=gdpr_id,
-                pbd_id=pbd_id,
-                iso_id=iso_id,
-                vulnerability_id=vulnerability_id,
-                from_pos=from_pos,
-                size=size
-            )
-            
-            return result
-        else:
-            # Fallback alla ricerca nel database
-            from src.controllers.pattern_controller import PatternController
-            
-            # Calcola skip e limit
-            skip = from_pos
-            limit = size
-            
-            result = PatternController.get_patterns(
-                db=db,
-                skip=skip,
-                limit=limit,
-                strategy=strategy,
-                mvc_component=mvc_component,
-                gdpr_id=gdpr_id,
-                pbd_id=pbd_id,
-                iso_id=iso_id,
-                vulnerability_id=vulnerability_id,
-                search_term=query
-            )
-            
-            # Adatta il formato del risultato
-            return {
-                "total": result["total"],
-                "results": [
-                    {
-                        "id": pattern.id,
-                        "title": pattern.title,
-                        "description": pattern.description,
-                        "strategy": pattern.strategy,
-                        "mvc_component": pattern.mvc_component,
-                        "created_at": pattern.created_at.isoformat(),
-                        "updated_at": pattern.updated_at.isoformat(),
-                        "score": 1.0
-                    }
-                    for pattern in result["patterns"]
-                ]
-            }
-    
-    def index_pattern(self, pattern: PrivacyPattern) -> bool:
-        """
-        Indicizza un pattern in Elasticsearch.
-        
-        Args:
-            pattern (PrivacyPattern): Pattern da indicizzare
-            
-        Returns:
-            bool: True se l'operazione è riuscita, False altrimenti
-        """
-        if not self.search_service.es:
-            return False
-        
-        return self.search_service.index_pattern(pattern)
-    
-    def remove_pattern_from_index(self, pattern_id: int) -> bool:
-        """
-        Rimuove un pattern dall'indice.
-        
-        Args:
-            pattern_id (int): ID del pattern da rimuovere
-            
-        Returns:
-            bool: True se l'operazione è riuscita, False altrimenti
-        """
-        if not self.search_service.es:
-            return False
-        
-        return self.search_service.remove_pattern_from_index(pattern_id)
-    
-    def reindex_all_patterns(self, db: Session) -> bool:
-        """
-        Reindicizza tutti i pattern.
-        
-        Args:
-            db (Session): Sessione database
-            
-        Returns:
-            bool: True se l'operazione è riuscita, False altrimenti
-        """
-        if not self.search_service.es:
-            return False
-        
-        return self.search_service.reindex_all_patterns(db)
+        # Utilizziamo direttamente il servizio SQL
+        return self.search_service.search_patterns(
+            db=db,
+            query=query,
+            strategy=strategy,
+            mvc_component=mvc_component,
+            gdpr_id=gdpr_id,
+            pbd_id=pbd_id,
+            iso_id=iso_id,
+            vulnerability_id=vulnerability_id,
+            from_pos=from_pos,
+            size=size
+        )
     
     def get_autocomplete_suggestions(
         self, 
@@ -168,47 +81,21 @@ class SearchController:
         Returns:
             List[Dict[str, Any]]: Lista di suggerimenti
         """
-        # Se Elasticsearch è disponibile
-        if self.search_service.es:
-            try:
-                # Usa Elasticsearch per suggerimenti
-                body = {
-                    "size": 0,
-                    "suggest": {
-                        "pattern_suggest": {
-                            "prefix": query,
-                            "completion": {
-                                "field": "title.completion",
-                                "size": limit
-                            }
-                        }
-                    }
-                }
-                
-                response = self.search_service.es.search(
-                    index=self.search_service.index_name,
-                    body=body
-                )
-                
-                suggestions = []
-                for option in response["suggest"]["pattern_suggest"][0]["options"]:
-                    suggestions.append({
-                        "id": option["_source"]["id"],
-                        "title": option["_source"]["title"],
-                        "text": option["text"]
-                    })
-                
-                return suggestions
-            except Exception as e:
-                logger.error(f"Errore in autocomplete con Elasticsearch: {str(e)}")
-        
-        # Fallback: ricerca nel database
-        search_term = f"%{query}%"
-        patterns = db.query(PrivacyPattern).filter(
-            PrivacyPattern.title.ilike(search_term)
-        ).limit(limit).all()
-        
-        return [
-            {"id": p.id, "title": p.title, "text": p.title} 
-            for p in patterns
-        ]
+        return self.search_service.get_autocomplete_suggestions(
+            db=db,
+            query=query,
+            limit=limit
+        )
+    
+    # Questi metodi sono mantenuti per compatibilità
+    def index_pattern(self, pattern: PrivacyPattern) -> bool:
+        """Stub per compatibilità."""
+        return True
+    
+    def remove_pattern_from_index(self, pattern_id: int) -> bool:
+        """Stub per compatibilità."""
+        return True
+    
+    def reindex_all_patterns(self, db: Session) -> bool:
+        """Stub per compatibilità."""
+        return True

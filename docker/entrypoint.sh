@@ -1,4 +1,5 @@
 #!/bin/bash
+# docker/entrypoint.sh - Rimozione controllo Elasticsearch
 set -e
 
 # Funzione per verificare servizi
@@ -38,22 +39,6 @@ fi
 
 # Attendi disponibilità database
 check_service "PostgreSQL" "$DB_HOST" "$DB_PORT" "30" || exit 1
-
-# Estrai parametri Elasticsearch o usa valori predefiniti
-if [ -n "$ELASTICSEARCH_URL" ]; then
-    # Estrai host e porta dall'ELASTICSEARCH_URL
-    ES_HOST=$(echo $ELASTICSEARCH_URL | sed -e 's|^http://\(.*\):.*|\1|')
-    ES_PORT=$(echo $ELASTICSEARCH_URL | sed -e 's|^http://.*:\(.*\)$|\1|')
-else
-    # Valori predefiniti
-    ES_HOST="elasticsearch"
-    ES_PORT="9200"
-fi
-
-# Attendi disponibilità elasticsearch (con gestione errori)
-if ! check_service "Elasticsearch" "$ES_HOST" "$ES_PORT" "30"; then
-    echo "AVVISO: Elasticsearch non disponibile, proseguo con funzionalità limitate."
-fi
 
 # Esegui migrazioni
 echo "Esecuzione migrazioni database..."
