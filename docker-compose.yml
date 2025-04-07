@@ -4,7 +4,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile
+      dockerfile: docker/Dockerfile.api
     restart: unless-stopped
     volumes:
       - ./:/app
