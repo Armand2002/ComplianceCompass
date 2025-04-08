@@ -123,8 +123,7 @@ def configure_logging(
         formatter = JSONFormatter(include_stack_info=True)
     else:
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - '
-            '%(request_id)s - %(user_id)s - %(message)s',
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
     
