@@ -37,8 +37,7 @@ class NewsletterSubscriberResponse(NewsletterSubscriberBase):
     updated_at: datetime
     preferences: Optional[Dict[str, Any]] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NewsletterCampaignBase(BaseModel):
@@ -76,8 +75,7 @@ class NewsletterCampaignResponse(NewsletterCampaignBase):
     updated_at: datetime
     target_segment: Optional[Dict[str, Any]] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NewsletterDeliveryBase(BaseModel):
@@ -113,8 +111,7 @@ class NewsletterDeliveryResponse(NewsletterDeliveryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SubscriptionVerificationRequest(BaseModel):
@@ -167,9 +164,17 @@ class NewsletterSubscription(NewsletterSubscriptionBase):
     """Schema per una iscrizione alla newsletter."""
     id: int
     is_active: bool
+    is_verified: bool
     created_at: datetime
+    subscribed_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)  # Formato aggiornato per Pydantic v2
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NewsletterSubscriptionResponse(NewsletterSubscription):
+    """Schema di risposta per le iscrizioni alla newsletter."""
+    # Eredita tutti gli attributi da NewsletterSubscription
+    pass
 
 
 class NewsletterIssueBase(BaseModel):
@@ -190,3 +195,25 @@ class NewsletterIssue(NewsletterIssueBase):
     sent_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NewsletterIssueResponse(NewsletterIssue):
+    """Schema di risposta per le edizioni newsletter."""
+    # Eredita tutti gli attributi da NewsletterIssue
+    pass
+
+
+class NewsletterIssueList(BaseModel):
+    """Schema per la lista paginata di edizioni newsletter."""
+    items: List[NewsletterIssueResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class NewsletterSubscriptionList(BaseModel):
+    """Schema per la lista paginata di iscrizioni newsletter."""
+    items: List[NewsletterSubscriptionResponse]
+    total: int
+    page: int
+    page_size: int

@@ -244,3 +244,6 @@ class NewsletterController:
             "successful_sends": result.get("successful_sends", 0),
             "failed_sends": result.get("failed_sends", 0)
         }
+
+# Crea un'istanza singleton del controller
+newsletter_controller = NewsletterController()

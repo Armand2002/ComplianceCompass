@@ -1,73 +1,69 @@
 # src/auth/dependencies.py
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from src.db.session import get_db
 from src.models.user_model import User
-from src.utils.jwt import decode_token
+from src.config import settings
+from src.schemas.user import UserResponse
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """
-    Ottiene l'utente corrente dal token JWT.
-    
-    Args:
-        token (str): Token JWT
-        db (Session): Sessione database
-        
-    Returns:
-        User: Utente autenticato
-        
-    Raises:
-        HTTPException: Se l'autenticazione fallisce
-    """
+def decode_token(token: str) -> dict:
+    """Decodifica un token JWT."""
     try:
-        payload = decode_token(token)
-        user_id = payload.get("sub")
-        
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token di autenticazione non valido",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-    except Exception:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+        return payload
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token di autenticazione non valido o scaduto",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Token non valido",
+            headers={"WWW-Authenticate": "Bearer"},
         )
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """Ottiene l'utente corrente dal token JWT."""
+    payload = decode_token(token)
+    user_id = payload.get("sub")
     
-    user = db.query(User).filter(User.id == user_id).first()
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token non valido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    user = db.query(User).filter(User.id == int(user_id)).first()
     
-    if user is None:
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Utente non trovato",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    
+        
     return user
 
-async def get_current_admin_user(current_user: User = Depends(get_current_user)):
-    """
-    Verifica che l'utente corrente sia un admin.
-    
-    Args:
-        current_user (User): Utente corrente
-        
-    Returns:
-        User: Utente admin
-        
-    Raises:
-        HTTPException: Se l'utente non è un admin
-    """
+def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    """Verifica che l'utente corrente sia attivo."""
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Utente non attivo",
+        )
+    return current_user
+
+def get_current_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
+    """Verifica che l'utente corrente sia un amministratore."""
     if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permessi insufficienti. Richiesti privilegi di amministratore"
+            detail="Permessi insufficienti",
         )
-    
     return current_user
+

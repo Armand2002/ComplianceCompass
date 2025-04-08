@@ -3,7 +3,7 @@ Modelli per la gestione delle newsletter.
 """
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 from sqlalchemy import Column, String, Boolean, DateTime, Text, JSON, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
@@ -91,6 +91,9 @@ class NewsletterSubscription(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String(255), nullable=True)
+    subscribed_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

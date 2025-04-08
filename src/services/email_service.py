@@ -22,7 +22,7 @@ class EmailService:
     def __init__(self):
         """Inizializza il servizio email con i template Jinja2."""
         try:
-            templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates/email")
+            templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates/emails")
             self.env = Environment(
                 loader=FileSystemLoader(templates_dir),
                 autoescape=select_autoescape(['html', 'xml'])

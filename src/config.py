@@ -28,10 +28,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/compliance_compass")
     
     # JWT
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "compliance_compass_secret_key")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "default_secret_key")
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # Aggiungi questa linea
     
     # CORS settings
     CORS_ORIGINS: List[str] = Field(
@@ -65,12 +65,12 @@ class Settings(BaseSettings):
     # API AI per Chatbot
     AI_API_KEY: str = os.getenv("AI_API_KEY", "")
     
-    class Config:
-        """Configurazione del modello Settings."""
-        case_sensitive = True
-        env_file = ".env"
-        extra = "ignore"  # Ignora campi extra nel file .env
+    # Utilizzare model_config anziché Config in Pydantic v2
+    model_config = {
+        "case_sensitive": True,
+        "env_file": ".env",
+        "extra": "ignore"  # Ignora campi extra nel file .env
+    }
 
 # Istanza singleton delle impostazioni
-
 settings = Settings()
