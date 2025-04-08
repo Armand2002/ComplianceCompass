@@ -1,0 +1,131 @@
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+  padding: 0 20px;
+  background-color: white; // Esplicita il colore di sfondo bianco
+  color: #333; // Colore testo scuro
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: #1976d2 !important; // Forza il colore blu invece di bianco
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 15px;
+  display: flex; 
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background-color: rgba(25, 118, 210, 0.1); // Hover blu chiaro
+    border-radius: 4px;
+  }
+  
+  /* Stile per l'icona */
+  svg {
+    width: 20px;
+    height: 20px;
+    color: #1976d2 !important; // Forza il colore blu
+    display: block;
+    fill: #1976d2 !important; // Forza il riempimento blu
+  }
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #333; // Colore testo scuro
+}
+
+.logo {
+  height: 36px;
+  margin-right: 10px;
+}
+
+.logo-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1976d2; // Testo logo in blu
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  
+  .user-name {
+    margin-right: 15px;
+    font-weight: 500;
+    color: #333; // Colore testo scuro
+  }
+}
+
+.header-icon {
+  color: #1976d2 !important; // Forza il colore blu
+  font-size: 1.1rem;
+  margin-left: 15px;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background-color: rgba(25, 118, 210, 0.1); // Hover blu chiaro
+  }
+  
+  /* Esplicita per l'icona */
+  svg {
+    width: 18px;
+    height: 18px;
+    color: #1976d2 !important; // Forza il colore blu
+    display: block;
+    fill: #1976d2 !important; // Forza il riempimento blu
+  }
+}
+
+.auth-links {
+  display: flex;
+  
+  .auth-link {
+    color: #1976d2; // Colore dei link in blu
+    text-decoration: none;
+    padding: 8px 15px;
+    margin-left: 10px;
+    border-radius: 4px;
+    font-weight: 500;
+    
+    &:hover {
+      background-color: rgba(25, 118, 210, 0.1); // Hover blu chiaro
+    }
+  }
+}
+
+/* Stili responsive */
+@media (max-width: 768px) {
+  .logo-text {
+    display: none;
+  }
+  
+  .user-name {
+    display: none;
+  }
+}

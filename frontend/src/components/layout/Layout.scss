@@ -1,0 +1,63 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 120px); /* Sottrai altezza header + footer */
+}
+
+.sidebar {
+  position: sticky;
+  top: 60px; /* Altezza dell'header */
+  width: 250px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  transition: width 0.3s;
+  z-index: 10;
+  flex-shrink: 0; /* Impedisce alla sidebar di restringersi */
+}
+
+.content {
+  flex: 1;
+  padding: 20px;
+  transition: margin-left 0.3s;
+  overflow-x: hidden; /* Impedisce lo scroll orizzontale */
+}
+
+.sidebar-open {
+  margin-left: 0;
+}
+
+.sidebar-closed {
+  margin-left: -250px;
+}
+
+.footer {
+  position: relative; /* Non fixed o absolute */
+  width: 100%;
+  padding: 15px 0;
+  z-index: 5;
+}
+
+/* Stili responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  
+  .sidebar.open {
+    width: 250px;
+  }
+  
+  .content.sidebar-open {
+    margin-left: 0;
+  }
+}

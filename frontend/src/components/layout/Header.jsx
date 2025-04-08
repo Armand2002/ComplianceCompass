@@ -1,104 +1,56 @@
-import React, { useState, useContext } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { FaBars, FaBell, FaUser, FaSearch, FaSignOutAlt, FaEnvelope } from 'react-icons/fa';
-import { AuthContext } from '../../context/AuthContext';
+import React, { useState } from 'react';
+import { Link, NavLink } from 'react-router-dom';
+import './Header.scss';
+import { FaBars, FaEnvelope, FaUser, FaSignOutAlt } from 'react-icons/fa';
 
-const Header = ({ toggleSidebar, user }) => {
-  const { logout } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Toggle del dropdown utente
-  const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen);
-  };
-
-  // Gestione del logout
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  // Gestione della ricerca
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setSearchQuery('');
-    }
+export const Header = ({ toggleSidebar, user }) => {
+  // Definisci lo stile per le icone con un colore diverso
+  const iconStyle = {
+    color: '#1976d2', // colore blu primario 
+    fontSize: '20px'
   };
 
   return (
     <header className="app-header">
       <div className="header-left">
-        <button className="sidebar-toggle" onClick={toggleSidebar}>
-          <FaBars />
+        <button className="sidebar-toggle" onClick={toggleSidebar} aria-label="Toggle sidebar">
+          <FaBars style={iconStyle} />
         </button>
-        <Link to="/" className="logo">
-          <img src="/assets/images/logo.png" alt="Compliance Compass" />
-          <span>Compliance Compass</span>
+        
+        <Link to="/" className="logo-container">
+          <img src="/logo.png" alt="ComplianceCompass Logo" className="logo" />
+          <span className="logo-text">ComplianceCompass</span>
         </Link>
       </div>
-
-      <div className="header-search">
-        <form onSubmit={handleSearch}>
-          <div className="search-input-container">
-            <FaSearch className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Cerca pattern, articoli GDPR..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </form>
-      </div>
-
+      
       <div className="header-right">
-        <div className="notification-icon">
-          <Link to="/notifications">
-            <FaBell />
-            {/* Badge per le notifiche non lette */}
-            <span className="notification-badge">3</span>
-          </Link>
-        </div>
-
-        <div className="user-profile">
-          <button className="profile-button" onClick={toggleDropdown}>
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt={user.username} className="avatar" />
-            ) : (
-              <FaUser className="avatar-icon" />
-            )}
-            <span className="username">{user?.username || 'Utente'}</span>
-          </button>
-
-          {dropdownOpen && (
-            <div className="profile-dropdown">
-              <ul>
-                <li>
-                  <Link to="/profile">
-                    <FaUser />
-                    <span>Profilo</span>
-                  </Link>
-                </li>
-                <li>
-                  <button onClick={handleLogout} className="logout-button">
-                    <FaSignOutAlt />
-                    <span>Logout</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          )}
-        </div>
+        {user ? (
+          <div className="user-menu">
+            <span className="user-name">{user.username}</span>
+            <Link to="/profile" className="header-icon">
+              <FaUser style={iconStyle} />
+            </Link>
+            <Link to="/logout" className="header-icon">
+              <FaSignOutAlt style={iconStyle} />
+            </Link>
+          </div>
+        ) : (
+          <div className="auth-links">
+            <Link to="/login" className="auth-link">Accedi</Link>
+            <Link to="/register" className="auth-link">Registrati</Link>
+          </div>
+        )}
       </div>
     </header>
   );
 };
 
 const Sidebar = () => {
+  const sidebarIconStyle = {
+    color: '#1976d2', // colore blu primario
+    fontSize: '18px'
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -113,7 +65,7 @@ const Sidebar = () => {
               to="/newsletter/manage" 
               className={({ isActive }) => isActive ? 'active' : ''}
             >
-              <FaEnvelope className="icon" />
+              <FaEnvelope style={sidebarIconStyle} className="icon" />
               <span>Gestisci Newsletter</span>
             </NavLink>
           </li>
@@ -123,4 +75,4 @@ const Sidebar = () => {
   );
 };
 
-export { Header, Sidebar };
+export { Sidebar };
