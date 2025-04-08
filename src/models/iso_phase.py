@@ -23,3 +23,13 @@ class ISOPhase(Base):
     
     def __repr__(self):
         return f"<ISOPhase(id={self.id}, name='{self.name}', standard='{self.standard}')>"
+    
+    def to_dict(self):
+        """Converte l'oggetto in un dizionario."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }

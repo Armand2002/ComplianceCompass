@@ -78,3 +78,14 @@ class GDPRArticle(Base):
         if offset is not None:
             query = query.offset(offset)
         return query.all()
+    
+    def to_dict(self):
+        """Converte l'oggetto in un dizionario."""
+        return {
+            "id": self.id,
+            "number": self.number,
+            "title": self.title,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }

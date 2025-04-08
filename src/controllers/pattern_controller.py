@@ -103,23 +103,23 @@ class PatternController:
             )
         
         # Conteggio totale per la paginazione
-        total = query.count()
+        total_query = query
+        total_patterns = total_query.count()
         
         # Applica paginazione
-        patterns = query.order_by(PrivacyPattern.title).offset(skip).limit(limit).all()
+        patterns = query.offset(skip).limit(limit).all()
         
         # Converti i pattern in dizionari per evitare errori di serializzazione Pydantic
         pattern_dicts = [pattern.to_dict() for pattern in patterns]
         
         # Calcola informazioni di paginazione
         page = skip // limit + 1
-        pages = (total + limit - 1) // limit  # Ceiling division
+        pages = (total_patterns + limit - 1) // limit if limit > 0 else 0
         
         return {
-            "patterns": pattern_dicts,  # Ora restituiamo dizionari invece di oggetti ORM
-            "total": total,
+            "patterns": pattern_dicts,
+            "total": total_patterns,
             "page": page,
-            "size": limit,
             "pages": pages
         }
     

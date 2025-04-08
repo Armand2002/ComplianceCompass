@@ -69,9 +69,7 @@ class PrivacyPattern(Base):
         return f"<PrivacyPattern(id={self.id}, title='{self.title}')>"
     
     def to_dict(self):
-        """
-        Converte l'oggetto PrivacyPattern in un dizionario per la serializzazione API.
-        """
+        """Converte l'oggetto in un dizionario per la serializzazione."""
         return {
             "id": self.id,
             "title": self.title,
@@ -84,10 +82,15 @@ class PrivacyPattern(Base):
             "mvc_component": self.mvc_component,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "created_by_id": self.created_by_id,
-            "view_count": self.view_count,
-            "gdpr_articles": [article.to_dict() if hasattr(article, 'to_dict') else {"id": article.id, "name": article.name} for article in self.gdpr_articles],
-            "pbd_principles": [principle.to_dict() if hasattr(principle, 'to_dict') else {"id": principle.id, "name": principle.name} for principle in self.pbd_principles],
-            "iso_phases": [phase.to_dict() if hasattr(phase, 'to_dict') else {"id": phase.id, "name": phase.name} for phase in self.iso_phases],
-            "vulnerabilities": [vuln.to_dict() if hasattr(vuln, 'to_dict') else {"id": vuln.id, "name": vuln.name} for vuln in self.vulnerabilities]
+            "created_by_id": getattr(self, "created_by_id", None),
+            "view_count": getattr(self, "view_count", 0),
+            # Relazioni
+            "gdpr_articles": [{"id": g.id, "number": g.number, "title": g.title} 
+                              for g in getattr(self, "gdpr_articles", [])],
+            "pbd_principles": [{"id": p.id, "name": p.name} 
+                               for p in getattr(self, "pbd_principles", [])],
+            "iso_phases": [{"id": i.id, "name": i.name} 
+                           for i in getattr(self, "iso_phases", [])],
+            "vulnerabilities": [{"id": v.id, "cwe_id": v.cwe_id, "name": v.name} 
+                                for v in getattr(self, "vulnerabilities", [])]
         }
