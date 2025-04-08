@@ -4,9 +4,6 @@
 # Exit on any error
 set -e
 
-# Print commands for debugging
-# set -x
-
 # Logging function
 log() {
     echo "[ENTRYPOINT] $1"
@@ -39,7 +36,7 @@ wait_for_database() {
 # Run database migrations
 run_migrations() {
     log "Running database migrations..."
-    alembic upgrade head
+    cd /app && alembic upgrade head
 }
 
 # Seed database

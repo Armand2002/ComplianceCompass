@@ -1,10 +1,11 @@
 # src/services/email_service.py
 import logging
 import smtplib
+import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List, Optional
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.config import settings
 from src.models.notification import NotificationType
@@ -21,8 +22,9 @@ class EmailService:
     def __init__(self):
         """Inizializza il servizio email con i template Jinja2."""
         try:
+            templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates/email")
             self.env = Environment(
-                loader=PackageLoader('src', 'templates/email'),
+                loader=FileSystemLoader(templates_dir),
                 autoescape=select_autoescape(['html', 'xml'])
             )
         except Exception as e:

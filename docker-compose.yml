@@ -9,6 +9,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
       - ./scripts:/app/scripts
       - ./docker:/app/docker  # Mount docker directory to ensure entrypoint is accessible
     environment:

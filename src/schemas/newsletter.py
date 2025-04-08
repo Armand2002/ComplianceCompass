@@ -1,7 +1,7 @@
 """
 Schemi per la gestione delle newsletter.
 """
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
@@ -151,3 +151,42 @@ class NewsletterCampaignsList(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class NewsletterSubscriptionBase(BaseModel):
+    """Schema base per le iscrizioni alla newsletter."""
+    email: EmailStr
+
+
+class NewsletterSubscriptionCreate(NewsletterSubscriptionBase):
+    """Schema per la creazione di una nuova iscrizione."""
+    pass
+
+
+class NewsletterSubscription(NewsletterSubscriptionBase):
+    """Schema per una iscrizione alla newsletter."""
+    id: int
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)  # Formato aggiornato per Pydantic v2
+
+
+class NewsletterIssueBase(BaseModel):
+    """Schema base per le edizioni della newsletter."""
+    title: str
+    content: str
+
+
+class NewsletterIssueCreate(NewsletterIssueBase):
+    """Schema per la creazione di una nuova edizione."""
+    pass
+
+
+class NewsletterIssue(NewsletterIssueBase):
+    """Schema per una edizione della newsletter."""
+    id: int
+    created_at: datetime
+    sent_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

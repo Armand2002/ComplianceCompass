@@ -6,6 +6,8 @@ Questo modulo definisce eccezioni custom per gestire
 casi specifici di errore nell'applicazione.
 """
 
+from fastapi import HTTPException, status
+
 class DomainException(Exception):
     """
     Eccezione base per errori di dominio.
@@ -41,27 +43,14 @@ class DomainException(Exception):
         return self.message
 
 
-class ServiceUnavailableException(DomainException):
-    """
-    Eccezione sollevata quando un servizio esterno non è disponibile.
-    
-    Utilizzata per gestire scenari in cui servizi come Elasticsearch, 
-    API esterne o database non sono raggiungibili.
-    """
-    def __init__(self, service_name: str, reason: str = None):
-        """
-        Inizializza l'eccezione per servizio non disponibile.
-        
-        Args:
-            service_name (str): Nome del servizio non disponibile
-            reason (str, optional): Ragione specifica dell'indisponibilità
-        """
-        message = f"Servizio '{service_name}' non disponibile"
-        if reason:
-            message += f": {reason}"
-        
-        super().__init__(message, error_code="SERVICE_UNAVAILABLE")
-        self.service_name = service_name
+class ServiceUnavailableException(HTTPException):
+    def __init__(self, detail="Servizio temporaneamente non disponibile"):
+        super().__init__(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=detail)
+
+
+class ResourceNotFoundException(HTTPException):
+    def __init__(self, detail="Risorsa non trovata"):
+        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
 class DataIntegrityException(DomainException):

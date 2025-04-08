@@ -82,3 +82,29 @@ class NewsletterDelivery(Base):
 
     def __repr__(self):
         return f"<NewsletterDelivery campaign={self.campaign_id}, subscriber={self.subscriber_id}, status={self.status}>"
+
+
+class NewsletterSubscription(Base):
+    """Model for newsletter subscriptions."""
+    __tablename__ = "newsletter_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class NewsletterIssue(Base):
+    """Model for newsletter issues."""
+    __tablename__ = "newsletter_issues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    
+    created_by = relationship("User", back_populates="newsletter_issues")

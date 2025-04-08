@@ -48,6 +48,7 @@ RUN mkdir -p /app/data /app/logs && \
 
 # Copy project files
 COPY --chown=appuser:appuser alembic/ /app/alembic/
+COPY --chown=appuser:appuser alembic.ini /app/alembic.ini
 COPY --chown=appuser:appuser scripts/ /app/scripts/
 COPY --chown=appuser:appuser src/ /app/src/
 COPY --chown=appuser:appuser requirements.txt /app/
