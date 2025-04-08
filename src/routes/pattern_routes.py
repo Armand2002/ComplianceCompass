@@ -8,7 +8,7 @@ from src.db.session import get_db
 from src.controllers.pattern_controller import PatternController
 from src.controllers.search_controller import SearchController
 from src.models.user_model import User
-from src.middleware.auth_middleware import get_current_user, get_current_editor_user, get_current_admin_user, permission_required
+from src.middleware.auth_middleware import get_current_user, get_current_editor_user, get_current_admin_user
 from src.schemas.privacy_pattern import (
     PatternCreate, 
     PatternUpdate, 
@@ -162,110 +162,7 @@ async def get_pattern_stats(db: Session = Depends(get_db)):
     "/{pattern_id}",
     response_model=PatternResponse,
     summary="Recupera dettagli di un privacy pattern specifico",
-    description="""
-    Restituisce i dettagli completi di un privacy pattern specifico in base all'ID.
-    
-    Include tutte le informazioni sul pattern:
-    - Titolo e descrizione completa
-    - Contesto di applicazione e problema risolto
-    - Soluzione proposta e conseguenze
-    - Strategia di privacy e componente MVC
-    - Collegamenti a articoli GDPR, principi PbD e fasi ISO
-    - Vulnerabilità mitigate secondo CWE e OWASP
-    - Esempi di implementazione
-    
-    Per ottenere pattern correlati, utilizzare l'endpoint `/api/patterns/related/{pattern_id}`.
-    """,
-    response_description="Dettagli completi del privacy pattern richiesto",
-    responses={
-        200: {
-            "description": "Privacy pattern trovato",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "id": 1,
-                        "title": "Minimizzazione dei dati",
-                        "description": "Pattern per ridurre la raccolta di dati al minimo necessario",
-                        "context": "Applicabile in contesti dove vengono raccolti dati personali dagli utenti",
-                        "problem": "La raccolta eccessiva di dati aumenta i rischi di privacy",
-                        "solution": "Identificare i dati minimi necessari per ciascuna finalità",
-                        "consequences": "Riduzione dei rischi di privacy, maggiore conformità al GDPR",
-                        "strategy": "Minimize",
-                        "mvc_component": "Model",
-                        "created_at": "2025-01-15T10:30:00Z",
-                        "updated_at": "2025-04-01T15:45:00Z",
-                        "created_by_id": 1,
-                        "gdpr_articles": [
-                            {
-                                "id": 1,
-                                "number": "5.1.c",
-                                "title": "Minimizzazione dei dati"
-                            }
-                        ],
-                        "pbd_principles": [
-                            {
-                                "id": 2,
-                                "name": "Privacy come impostazione predefinita",
-                                "description": "La privacy è garantita per impostazione predefinita"
-                            }
-                        ],
-                        "iso_phases": [
-                            {
-                                "id": 2,
-                                "name": "Analisi dei requisiti",
-                                "standard": "ISO/IEC 27001"
-                            }
-                        ],
-                        "vulnerabilities": [
-                            {
-                                "id": 3,
-                                "name": "Esposizione di dati sensibili",
-                                "severity": "HIGH"
-                            }
-                        ],
-                        "examples": [
-                            {
-                                "id": 1,
-                                "title": "Implementazione minimizzazione in form web",
-                                "description": "Esempio di form che raccoglie solo dati essenziali",
-                                "language": "JavaScript"
-                            }
-                        ]
-                    }
-                }
-            }
-        },
-        404: {
-            "description": "Pattern non trovato",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "error": {
-                            "message": "Pattern con ID 999 non trovato",
-                            "error_id": "8f7d6e5c4b3a2190",
-                            "timestamp": 1617289104.85,
-                            "error_code": "PATTERN_NOT_FOUND"
-                        }
-                    }
-                }
-            }
-        },
-        500: {
-            "description": "Errore interno del server",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "error": {
-                            "message": "Si è verificato un errore interno",
-                            "error_id": "1a2b3c4d5e6f7890",
-                            "timestamp": 1617289104.85,
-                            "error_code": "INTERNAL_SERVER_ERROR"
-                        }
-                    }
-                }
-            }
-        }
-    }
+    description="Restituisce i dettagli completi di un privacy pattern specifico in base all'ID"
 )
 async def get_pattern(
     pattern_id: int = Path(..., title="Pattern ID", description="ID univoco del pattern da recuperare", gt=0),

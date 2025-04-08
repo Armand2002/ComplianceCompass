@@ -24,6 +24,12 @@ export const Header = ({ toggleSidebar, user }) => {
       </div>
       
       <div className="header-right">
+        {/* Link newsletter sempre visibile */}
+        <Link to="/newsletter/manage" className="newsletter-link">
+          <FaEnvelope style={iconStyle} />
+          <span className="newsletter-text">Newsletter</span>
+        </Link>
+        
         {user ? (
           <div className="user-menu">
             <span className="user-name">{user.username}</span>
