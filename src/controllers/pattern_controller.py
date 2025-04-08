@@ -22,7 +22,7 @@ class PatternController:
     """
     
     @staticmethod
-    def get_pattern(db: Session, pattern_id: int) -> Optional[PrivacyPattern]:
+    def get_pattern(db: Session, pattern_id: int) -> Optional[Dict[str, Any]]:
         """
         Recupera un pattern specifico dal database.
         
@@ -31,9 +31,12 @@ class PatternController:
             pattern_id (int): ID del pattern da recuperare
             
         Returns:
-            Optional[PrivacyPattern]: Pattern trovato o None
+            Optional[Dict[str, Any]]: Pattern trovato come dizionario o None
         """
-        return db.query(PrivacyPattern).filter(PrivacyPattern.id == pattern_id).first()
+        pattern = db.query(PrivacyPattern).filter(PrivacyPattern.id == pattern_id).first()
+        if pattern:
+            return pattern.to_dict()
+        return None
     
     @staticmethod
     def get_patterns(
@@ -105,12 +108,15 @@ class PatternController:
         # Applica paginazione
         patterns = query.order_by(PrivacyPattern.title).offset(skip).limit(limit).all()
         
+        # Converti i pattern in dizionari per evitare errori di serializzazione Pydantic
+        pattern_dicts = [pattern.to_dict() for pattern in patterns]
+        
         # Calcola informazioni di paginazione
         page = skip // limit + 1
         pages = (total + limit - 1) // limit  # Ceiling division
         
         return {
-            "patterns": patterns,
+            "patterns": pattern_dicts,  # Ora restituiamo dizionari invece di oggetti ORM
             "total": total,
             "page": page,
             "size": limit,

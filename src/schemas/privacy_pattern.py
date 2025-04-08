@@ -1,5 +1,5 @@
 # src/schemas/privacy_pattern.py
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, constr
 
@@ -13,7 +13,7 @@ class PatternBase(BaseModel):
     solution: Annotated[str, constr(min_length=10)] = Field(..., description="Soluzione proposta dal pattern")
     consequences: Annotated[str, constr(min_length=10)] = Field(..., description="Conseguenze dell'applicazione del pattern")
     strategy: Annotated[str, constr(min_length=3, max_length=100)] = Field(..., description="Strategia di privacy (es. Minimize, Hide, Abstract)")
-    mvc_component: Annotated[str, constr(min_length=3, max_length=50)] = Field(..., description="Componente MVC (Model, View, Controller)")
+    mvc_component: Annotated[str, constr(min_length=3, max_length=50)] = Field(..., description="Componente MVC (Model, View, Controller")
 
 # Schema per la creazione
 class PatternCreate(PatternBase):
@@ -72,20 +72,28 @@ class ImplementationExampleBase(BaseModel):
     language: Optional[str] = None
 
 # Schema per la risposta
-class PatternResponse(PatternBase):
-    """Schema per la risposta con un Privacy Pattern completo."""
+class PatternResponse(BaseModel):
     id: int
-    created_at: datetime
-    updated_at: datetime
-    created_by_id: Optional[int] = None
-    gdpr_articles: List[GDPRArticleBase] = []
-    pbd_principles: List[PbDPrincipleBase] = []
-    iso_phases: List[ISOPhaseBase] = []
-    vulnerabilities: List[VulnerabilityBase] = []
-    examples: List[ImplementationExampleBase] = []
+    title: str
+    description: str
+    context: str
+    problem: str
+    solution: str
+    consequences: str
+    strategy: str
+    mvc_component: str
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    created_by_id: Optional[int]
+    view_count: Optional[int] = 0
+    gdpr_articles: Optional[List[Dict[str, Any]]] = []
+    pbd_principles: Optional[List[Dict[str, Any]]] = []
+    iso_phases: Optional[List[Dict[str, Any]]] = []
+    vulnerabilities: Optional[List[Dict[str, Any]]] = []
 
     class Config:
         orm_mode = True
+        arbitrary_types_allowed = True
 
 # Schema per la lista di pattern
 class PatternList(BaseModel):

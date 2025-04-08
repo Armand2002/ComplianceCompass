@@ -112,6 +112,7 @@ async def get_patterns(
             search_term=search
         )
         
+        # I pattern ora sono già dizionari, quindi possiamo direttamente creare PatternList
         return PatternList(
             patterns=result["patterns"],
             total=result["total"],
@@ -120,7 +121,6 @@ async def get_patterns(
             pages=result["pages"]
         )
     except Exception as e:
-        # Log dettagliato dell'errore (omesso per brevità)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
