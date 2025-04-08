@@ -1,31 +1,17 @@
 // frontend/src/services/newsletterService.js
-/**
- * Servizio per la gestione delle operazioni relative alla newsletter
- */
+import axios from 'axios';
 
 /**
- * Iscrive un'email alla newsletter
+ * Iscrive un utente alla newsletter
  * @param {string} email - Email da iscrivere
- * @returns {Promise<Object>} Risposta dal server
+ * @returns {Promise<Object>} - Risultato dell'operazione
  */
 export const subscribeNewsletter = async (email) => {
   try {
-    const response = await fetch('/api/newsletter/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Errore durante l\'iscrizione alla newsletter');
-    }
-    
-    return await response.json();
+    const response = await axios.post('/api/newsletter/subscribe', { email });
+    return response.data;
   } catch (error) {
-    console.error('Newsletter subscription error:', error);
+    console.error('Errore iscrizione newsletter:', error);
     throw error;
   }
 };
@@ -34,22 +20,29 @@ export const subscribeNewsletter = async (email) => {
  * Verifica un'iscrizione alla newsletter tramite token
  * @param {string} email - Email da verificare
  * @param {string} token - Token di verifica
- * @returns {Promise<Object>} Risposta dal server
+ * @returns {Promise<Object>} - Risultato dell'operazione
  */
 export const verifyNewsletterSubscription = async (email, token) => {
   try {
-    const response = await fetch(`/api/newsletter/verify?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`, {
-      method: 'POST',
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Errore durante la verifica dell\'iscrizione');
-    }
-    
-    return await response.json();
+    const response = await axios.post('/api/newsletter/verify', { email, token });
+    return response.data;
   } catch (error) {
-    console.error('Newsletter verification error:', error);
+    console.error('Errore verifica iscrizione:', error);
+    throw error;
+  }
+};
+
+/**
+ * Ottiene lo stato di un'iscrizione alla newsletter
+ * @param {string} email - Email da verificare
+ * @returns {Promise<Object>} - Stato dell'iscrizione
+ */
+export const getNewsletterStatus = async (email) => {
+  try {
+    const response = await axios.get(`/api/newsletter/status?email=${encodeURIComponent(email)}`);
+    return response.data;
+  } catch (error) {
+    console.error('Errore controllo stato iscrizione:', error);
     throw error;
   }
 };
@@ -57,43 +50,14 @@ export const verifyNewsletterSubscription = async (email, token) => {
 /**
  * Cancella un'iscrizione alla newsletter
  * @param {string} email - Email da disiscrivere
- * @returns {Promise<Object>} Risposta dal server
+ * @returns {Promise<Object>} - Risultato dell'operazione
  */
 export const unsubscribeNewsletter = async (email) => {
   try {
-    const response = await fetch(`/api/newsletter/unsubscribe?email=${encodeURIComponent(email)}`, {
-      method: 'DELETE',
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Errore durante la cancellazione dell\'iscrizione');
-    }
-    
-    return await response.json();
+    const response = await axios.post('/api/newsletter/unsubscribe', { email });
+    return response.data;
   } catch (error) {
-    console.error('Newsletter unsubscribe error:', error);
-    throw error;
-  }
-};
-
-/**
- * Verifica lo stato di un'iscrizione alla newsletter
- * @param {string} email - Email da verificare
- * @returns {Promise<Object>} Risposta dal server con lo stato dell'iscrizione
- */
-export const getNewsletterStatus = async (email) => {
-  try {
-    const response = await fetch(`/api/newsletter/status?email=${encodeURIComponent(email)}`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Errore durante la verifica dello stato');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Newsletter status check error:', error);
+    console.error('Errore cancellazione iscrizione:', error);
     throw error;
   }
 };

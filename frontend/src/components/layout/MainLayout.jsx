@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import Header from './Header';
+import { Header } from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 
