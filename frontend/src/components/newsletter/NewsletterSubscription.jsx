@@ -38,7 +38,7 @@ const NewsletterSubscription = () => {
     } catch (error) {
       console.error('Errore durante l\'iscrizione:', error);
       setStatus('error');
-      setMessage(error.message || 'Si è verificato un errore durante l\'iscrizione. Riprova più tardi.');
+      setMessage(error.response?.data?.detail || 'Si è verificato un errore durante l\'iscrizione. Riprova più tardi.');
     }
   };
   

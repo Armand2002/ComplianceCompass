@@ -1,53 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import { FaShieldAlt, FaBook, FaSearch, FaRobot, FaDatabase, FaCode, FaLightbulb } from 'react-icons/fa';
+import NewsletterSubscription from '../components/newsletter/NewsletterSubscription';
+import '../styles/pages/homepage.scss';
 
 const HomePage = () => {
-  const [recentPatterns, setRecentPatterns] = useState([]);
-  const [statsData, setStatsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [recentPatterns, setRecentPatterns] = useState([]);
+  const [statsData, setStatsData] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchHomeData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
       try {
-        // Mock data per dimostrazione
-        setRecentPatterns([
-          {
-            id: 1,
-            title: "Minimizzazione dei dati",
-            description: "Principio che prevede la raccolta e l'utilizzo solo dei dati personali strettamente necessari per raggiungere una finalità specifica.",
-            strategy: "Minimize",
-            mvc_component: "Model"
-          },
-          {
-            id: 2,
-            title: "Consenso informato",
-            description: "Pattern che garantisce che gli utenti forniscano un consenso libero, specifico, informato e inequivocabile per il trattamento dei loro dati personali.",
-            strategy: "Inform",
-            mvc_component: "View"
-          },
-          {
-            id: 3,
-            title: "Pseudonimizzazione",
-            description: "Tecnica che sostituisce gli identificatori diretti con pseudonimi, mantenendo l'utilità dei dati ma riducendo i rischi per la privacy.",
-            strategy: "Abstract",
-            mvc_component: "Model"
-          }
-        ]);
+        setIsLoading(true);
         
-        // Mock stats
-        setStatsData({
-          total: 42,
-          strategies: {
-            "Minimize": 12,
-            "Hide": 8,
-            "Separate": 6,
-            "Aggregate": 5,
+        // Carica dati dalla API o utilizza dati di esempio se in sviluppo
+        const patternsResponse = await axios.get('/api/patterns?limit=4');
+        setRecentPatterns(patternsResponse.data.patterns || []);
+        
+        // Carica statistiche
+        const statsResponse = await axios.get('/api/patterns/stats');
+        setStatsData(statsResponse.data || {
+          "total_patterns": 12,
+          "strategies": {
+            "Minimize": 5,
             "Inform": 4,
             "Control": 3,
             "Enforce": 2,
@@ -87,17 +66,17 @@ const HomePage = () => {
       <div className="hero-section">
         <div className="hero-content">
           <h1>Simplifica la Privacy e la Compliance</h1>
-          <p>Esplora una raccolta completa di pattern, normative e best practice per implementare la privacy by design nei tuoi progetti.</p>
+          <p>Esplora pattern, linee guida e strumenti per incorporare la privacy nello sviluppo software</p>
           
           <form onSubmit={handleSearch} className="search-form">
             <div className="search-box">
               <FaSearch className="search-icon" />
-              <input
-                type="text"
-                placeholder="Cerca pattern, articoli GDPR..."
+              <input 
+                type="text" 
+                className="search-input"
+                placeholder="Cerca pattern, GDPR, tecniche..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
               />
             </div>
             <button type="submit" className="button primary">Cerca</button>
@@ -142,68 +121,55 @@ const HomePage = () => {
         </div>
       </div>
       
+      {/* Sezione Newsletter - NUOVA */}
+      <section className="newsletter-section">
+        <div className="container">
+          <div className="section-header">
+            <h2>Rimani Aggiornato</h2>
+            <p>Iscriviti alla nostra newsletter per ricevere aggiornamenti sui nuovi pattern 
+               di privacy e sulle ultime novità in materia di normative.</p>
+          </div>
+          
+          <div className="newsletter-container">
+            <NewsletterSubscription />
+          </div>
+        </div>
+      </section>
+      
       {/* Recent Patterns Section */}
       <div className="recent-patterns-section">
-        <div className="section-header">
-          <h2>Pattern Recenti</h2>
-          <Link to="/patterns" className="section-link">Visualizza tutti</Link>
-        </div>
-        
+        <h2>Pattern Recenti</h2>
         <div className="pattern-cards-grid">
-          {recentPatterns.length > 0 ? (
-            recentPatterns.map(pattern => (
-              <div key={pattern.id} className="pattern-card">
-                <div className="pattern-card-header">
-                  <div className="pattern-card-badges">
-                    <span className={`strategy-badge ${pattern.strategy.toLowerCase()}`}>
-                      {pattern.strategy}
-                    </span>
-                    <span className="mvc-badge">
-                      {pattern.mvc_component}
-                    </span>
-                  </div>
-                  
-                  <h3 className="pattern-card-title">
-                    <Link to={`/patterns/${pattern.id}`}>
-                      {pattern.title}
-                    </Link>
-                  </h3>
-                </div>
-                
-                <div className="pattern-card-content">
-                  <p className="pattern-card-description">
-                    {pattern.description.length > 150 
-                      ? `${pattern.description.substring(0, 150)}...` 
-                      : pattern.description
-                    }
-                  </p>
-                </div>
-                
-                <div className="pattern-card-footer">
-                  <Link to={`/patterns/${pattern.id}`} className="card-link">
-                    Dettagli
-                  </Link>
-                </div>
+          {recentPatterns.map(pattern => (
+            <div key={pattern.id} className="pattern-card">
+              <h3>{pattern.name || pattern.title}</h3>
+              <p className="pattern-description">{pattern.summary || pattern.description}</p>
+              <div className="pattern-tags">
+                <span className="pattern-category">{pattern.strategy}</span>
+                {pattern.mvc_component && (
+                  <span className="pattern-mvc">{pattern.mvc_component}</span>
+                )}
               </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <p>Nessun pattern disponibile.</p>
+              <Link to={`/patterns/${pattern.id}`} className="pattern-link">Esplora Pattern</Link>
             </div>
-          )}
+          ))}
+        </div>
+        <div className="view-all">
+          <Link to="/patterns" className="view-all-link">Visualizza tutti i pattern</Link>
         </div>
       </div>
       
-      {/* Quick Stats Section */}
+      {/* Stats Section */}
       <div className="stats-section">
+        <h2>ComplianceCompass in Numeri</h2>
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-icon">
               <FaShieldAlt />
             </div>
             <div className="stat-content">
-              <h3>Pattern Totali</h3>
-              <p className="stat-value">{statsData?.total || 0}</p>
+              <h3>Privacy Patterns</h3>
+              <p className="stat-value">{statsData?.total_patterns || 0}</p>
             </div>
           </div>
           
@@ -242,8 +208,11 @@ const HomePage = () => {
       {/* Call to Action Section */}
       <div className="cta-section">
         <h2>Inizia a Esplorare</h2>
-        <p>Scopri come i Privacy Pattern possono aiutarti a proteggere i dati dei tuoi utenti</p>
-        <Link to="/patterns" className="button primary">Esplora Ora</Link>
+        <p>Scopri come integrare la privacy nei tuoi progetti software</p>
+        <div className="cta-buttons">
+          <Link to="/patterns" className="button primary">Esplora i Pattern</Link>
+          <Link to="/gdpr" className="button secondary">Consulta il GDPR</Link>
+        </div>
       </div>
     </div>
   );

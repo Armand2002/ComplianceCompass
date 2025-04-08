@@ -1,0 +1,35 @@
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  
+  .layout-container {
+    display: flex;
+    flex: 1;
+    margin-top: 60px; // Altezza dell'header
+  }
+  
+  .main-content {
+    flex: 1;
+    transition: margin-left 0.3s ease;
+    padding: 1.5rem;
+    width: 100%;
+    
+    &.with-sidebar {
+      margin-left: 260px; // Larghezza della sidebar
+    }
+    
+    &.without-sidebar {
+      margin-left: 0;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .main-layout {
+    .main-content {
+      margin-left: 0 !important; // Sempre a larghezza piena su mobile
+      padding: 1rem;
+    }
+  }
+}

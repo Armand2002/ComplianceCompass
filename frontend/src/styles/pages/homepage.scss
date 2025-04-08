@@ -29,29 +29,46 @@
     max-width: 600px;
     margin: 0 auto;
     gap: var(--spacing-md);
-  }
-  
-  .search-box {
-    flex: 1;
-    position: relative;
     
-    .search-icon {
-      position: absolute;
-      left: var(--spacing-md);
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-secondary);
+    .search-box {
+      flex: 1;
+      position: relative;
+      
+      .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #666;
+        font-size: 16px;
+      }
+      
+      .search-input {
+        width: 100%;
+        padding: 12px 12px 12px 40px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        font-size: 16px;
+        
+        &:focus {
+          outline: none;
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.2);
+        }
+      }
     }
     
-    .search-input {
-      width: 100%;
-      padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) * 2 + 16px);
-      border-radius: var(--border-radius-md);
+    button[type="submit"] {
+      padding: 12px 20px;
+      background-color: var(--primary-color);
+      color: white;
       border: none;
-      font-size: var(--font-size-md);
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
       
-      &:focus {
-        outline: none;
+      &:hover {
+        background-color: #0056b3;
       }
     }
   }
@@ -209,6 +226,13 @@
         background-color: var(--background-color);
       }
     }
+    
+    .cta-buttons {
+      display: flex;
+      justify-content: center;
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
   }
   
   .empty-state {
@@ -220,16 +244,39 @@
   }
   
   @media (max-width: 768px) {
-    .features-grid, .stats-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .pattern-cards-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .search-form {
-      flex-direction: column;
+    .homepage-container {
+      padding: var(--spacing-md);
+      
+      .hero-section {
+        padding: var(--spacing-lg);
+        
+        h1 {
+          font-size: 2rem;
+        }
+        
+        p {
+          font-size: 1rem;
+        }
+      }
+      
+      .search-form {
+        flex-direction: column;
+        
+        button[type="submit"] {
+          margin-top: 10px;
+        }
+      }
+      
+      .features-grid, 
+      .stats-grid, 
+      .pattern-cards-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        gap: 10px;
+      }
     }
   }
 }
