@@ -28,6 +28,10 @@ from src.models.pbd_principle import PbDPrinciple
 from src.models.iso_phase import ISOPhase
 from src.models.vulnerability import Vulnerability, SeverityLevel
 from src.models.privacy_pattern import PrivacyPattern
+from src.models.notification import Notification
+from src.models.newsletter import NewsletterIssue
+from src.models.implementation_example import ImplementationExample
+import src.models  # Importa tutti i modelli per risolvere le dipendenze circolari
 from src.utils.password import get_password_hash
 from src.db.session import SessionLocal
 from src.services.search_service import SearchService

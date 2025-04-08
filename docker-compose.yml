@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build: 
@@ -43,12 +41,12 @@ services:
     build: 
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NODE_VERSION: 18  # Specify Node version
     container_name: compliance-compass-frontend
     volumes:
       - ./frontend:/app
       - /app/node_modules  # Prevent overwriting node_modules
-    environment:
-      - NODE_OPTIONS=--openssl-legacy-provider  # For Node 16 compatibility
     ports:
       - "3000:3000"
     networks:
