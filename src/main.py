@@ -1,5 +1,12 @@
 # src/main.py - Modificato per rimuovere Elasticsearch e Chatbot
 
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    import logging
+    logging.warning("psutil non è installato. Alcune funzionalità di monitoraggio saranno limitate.")
 import uvicorn
 from fastapi import FastAPI, Request, Depends, status
 from fastapi.responses import JSONResponse
@@ -16,10 +23,12 @@ from pydantic import BaseModel
 from fastapi_csrf_protect import CsrfProtect
 from fastapi_csrf_protect.exceptions import CsrfProtectError
 
+from src.routes import health_routes  # Mantieni solo questa importazione
 from src.middleware.rate_limit import RateLimitMiddleware
 from src.config import settings
 from src.routes.api import api_router
 from src.routes.faq_routes import router as faq_router  # Nuovo import (FAQ invece di chatbot)
+from src.routes import gdpr_routes  # Import GDPR routes
 from src.db.init_db import init_db
 from src.middleware.error_handler import register_exception_handlers
 from src.logging_config import configure_logging
@@ -33,6 +42,8 @@ from src.schemas.newsletter import NewsletterSubscriptionCreate
 from src.controllers.newsletter_controller import newsletter_controller
 from sqlalchemy.orm import Session
 from src.auth.dependencies import get_db
+from sqlalchemy.sql import text
+from src.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +153,14 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In produzione, limita agli URL effettivi del frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Registrazione errori di rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -168,7 +187,9 @@ def csrf_protect_exception_handler(request: Request, exc: CsrfProtectError):
 # Attivazione router
 app.include_router(api_router)
 app.include_router(newsletter_routes.router, prefix="/api")
-app.include_router(faq_router, prefix="/api")  # Aggiunto FAQ router
+app.include_router(faq_router, prefix="/api")
+app.include_router(gdpr_routes.router, prefix="/api")  # Aggiunto prefix="/api"
+app.include_router(health_routes.router, prefix="/api")
 
 # Endpoint per generare CSRF token
 @app.get("/api/csrf-token", tags=["Security"])
@@ -235,6 +256,26 @@ async def startup_event():
     
     logger.info("Applicazione avviata con successo")
 
+@app.on_event("startup")
+async def startup_checks():
+    """Esegue controlli all'avvio dell'applicazione."""
+    try:
+        # Verifica connessione DB
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            logger.info("Database connection: OK")
+        
+        logger.info("Application startup checks completed successfully.")
+    except Exception as e:
+        logger.error(f"Startup check failed: {str(e)}")
+        logger.exception("Dettaglio dell'errore:")
+
+@app.on_event("startup")
+async def log_routes():
+    """Log tutte le rotte all'avvio per debugging."""
+    route_paths = [{"path": route.path, "name": route.name, "methods": route.methods} for route in app.routes]
+    logger.info(f"Registered routes: {route_paths}")
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """
@@ -243,6 +284,19 @@ async def shutdown_event():
     Chiude le connessioni e libera le risorse.
     """
     logger.info("Spegnimento applicazione")
+
+# Alla fine del file, aggiungi un endpoint di test:
+@app.get("/api/debug/routes")
+async def debug_routes():
+    """Endpoint per il debug che mostra le rotte registrate."""
+    routes = []
+    for route in app.routes:
+        routes.append({
+            "path": route.path,
+            "name": route.name,
+            "methods": [method for method in route.methods] if route.methods else []
+        })
+    return {"routes": routes}
 
 # Se questo file viene eseguito direttamente
 if __name__ == "__main__":

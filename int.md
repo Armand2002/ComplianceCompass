@@ -1,361 +1,772 @@
-# Piano di sviluppo per l'importazione CSV in Compliance Compass
+Piano di Sviluppo Completo per ComplianceCompass
+Ho analizzato a fondo il tuo codebase e ho elaborato un piano di sviluppo completo per risolvere definitivamente tutti i problemi relativi agli errori 500 nelle API e ai problemi di rendering dei componenti React.
 
-Ora che hai a disposizione il file CSV `paste-2.txt`, posso offrirti un piano di sviluppo più mirato e semplificato. Questo piano è focalizzato esclusivamente sull'implementazione dello script CLI per importare i dati CSV nel tuo sistema.
+Problema Principale
+Il problema centrale è il disallineamento tra i modelli SQLAlchemy e lo schema del database, in particolare:
 
-## Fase 1: Preparazione (1 giorno)
+La colonna view_count definita nel modello PrivacyPattern ma non esistente nella tabella privacy_patterns
+Caricamento non ottimizzato delle relazioni nei modelli
+Problemi di resilienza nelle API
+Piano di Sviluppo in 5 Fasi
 
-### 1.1 Analisi del file CSV
-- Esaminare la struttura del file CSV (colonne: Pattern, Strategies, Description Pattern, ecc.)
-- Verificare la corrispondenza tra le colonne del CSV e le entità del database
-- Identificare eventuali trasformazioni necessarie per i dati
 
-### 1.2 Verifica delle dipendenze
-- Non sono necessarie dipendenze aggiuntive per il parsing CSV, poiché utilizzeremo il modulo standard `csv` di Python
-
-### 1.3 Aggiornamento del database
-- Verifica che le entità di riferimento (GDPR, PbD, vulnerabilità) siano già popolate nel database
-- Se necessario, crea script per popolare queste entità
-
-## Fase 2: Implementazione dello script (1-2 giorni)
-
-### 2.1 Creazione dello script di importazione
-```
-scripts/
-  import_privacy_patterns.py  # Nuovo file
-```
-
-Lo script avrà queste funzionalità:
-- Lettura del file CSV con supporto per diversi delimitatori (';', ',')
-- Mappatura delle colonne CSV ai campi del modello
-- Trasformazione dei valori (es. splitting di liste separate da virgole)
-- Creazione dei pattern e delle loro relazioni
-- Gestione degli errori e logging dettagliato
-- Supporto per modalità "dry run" (simulazione senza modifiche al database)
-
-### 2.2 Adattamenti specifici per il file CSV
-- Gestione delle colonne con più valori (es. GDPR, PbD, OWASP)
-- Pulizia dei dati (es. rimozione spazi, caratteri non validi)
-- Mapping dei valori (es. "Model" → "Model", "View" → "View", "Controller" → "Controller")
-
-## Fase 3: Testing e ottimizzazione (1 giorno)
-
-### 3.1 Test manuali
-- Test con un sottoinsieme del file CSV
-- Verifica della corretta importazione e delle relazioni
-- Verifica della gestione degli errori
-
-### 3.2 Ottimizzazioni
-- Miglioramento delle performance per file grandi
-- Aggiunta di opzioni per la gestione dei duplicati
-- Implementazione di transazioni atomiche
-
-## Fase 4: Documentazione e finalizzazione (0.5 giorni)
-
-### 4.1 Documentazione dello script
-- Aggiungere commenti dettagliati e docstrings
-- Creare una documentazione d'uso con esempi
-- Aggiungere informazioni al README del progetto
-
-### 4.2 Creazione di script di supporto
-- Script per verificare lo stato dell'importazione
-- Script per generare report sui dati importati
-
-## Implementazione dello script
-
-Ecco l'implementazione dello script di importazione basato sul tuo file CSV:
-
-```python
-#!/usr/bin/env python
-"""
-Script per importare privacy patterns da un file CSV nel database.
-
-Uso:
-    python -m scripts.import_privacy_patterns path/to/file.csv [--delimiter=";"] [--admin-id=1] [--dry-run]
-
-Argomenti:
-    file_path: Percorso del file CSV da importare
-    --delimiter: Separatore CSV (default: ';')
-    --admin-id: ID dell'utente admin (default: 1)
-    --dry-run: Simula l'importazione senza modificare il database
-"""
-import os
+Fase 1: Allineamento del Database (Giorno 1)
+1.1. Generazione di una migrazione unificata
+"""Script per generare una migrazione unificata che risolve tutti i problemi di schema."""
+import alembic.config
 import sys
-import csv
-import logging
-from datetime import datetime
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+import os
 
-# Aggiungi la directory principale al path per importare i moduli
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.models.privacy_pattern import PrivacyPattern
-from src.models.gdpr_model import GDPRArticle
-from src.models.pbd_principle import PbDPrinciple
-from src.models.iso_phase import ISOPhase
-from src.models.vulnerability import Vulnerability, SeverityLevel
-from src.models.user_model import User
-from src.db.session import SessionLocal
-
-# Configurazione logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Mapping delle colonne CSV ai campi del modello
-CSV_TO_MODEL_MAPPING = {
-    "Pattern": "title",
-    "Strategies": "strategy",
-    "Description Pattern": "description",
-    "Context Pattern": "context",
-    "Collocazione MVC": "mvc_component",
-    "ISO 9241-210 Phase": None,  # Gestito separatamente
-    "Article GDPR Compliance with the Pattern": None,  # Gestito separatamente
-    "Privacy By Design Principles": None,  # Gestito separatamente
-    "OWASP Top Ten Categories": None,  # Gestito separatamente
-    "CWE Top 25 Most Dangerous Software Weaknesses OWASP Categories Associated": None,  # Gestito separatamente
-    "Examples": "consequences"  # Usiamo il campo examples come consequences per ora
-}
-
-def clean_str(value):
-    """Pulisce e converte i valori in stringhe."""
-    if not value:
-        return ""
-    return str(value).strip()
-
-def split_values(value, delimiter=','):
-    """Divide una stringa in valori multipli."""
-    if not value:
-        return []
-    return [v.strip() for v in value.split(delimiter) if v.strip()]
-
-def import_csv_data(file_path, admin_id=1, delimiter=';', dry_run=False):
-    """
-    Importa i dati dal file CSV nel database.
+def main():
+    # Aggiungi la directory root al path
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     
-    Args:
-        file_path: Percorso del file CSV
-        admin_id: ID dell'utente admin che sarà impostato come creatore
-        delimiter: Separatore utilizzato nel CSV
-        dry_run: Se True, simula l'importazione senza modificare il database
-    """
-    db = SessionLocal()
+    # Configura alembic
+    alembic_args = [
+        '--raiseerr',
+        'revision',
+        '--autogenerate',
+        '-m', "align_models_with_database"
+    ]
     
-    try:
-        # Verifica che l'utente admin esista
-        admin = db.query(User).filter(User.id == admin_id).first()
-        if not admin:
-            logger.error(f"Utente admin con ID {admin_id} non trovato!")
-            return False
-        
-        logger.info(f"Admin trovato: {admin.username}")
-        
-        # Leggi il file CSV
-        logger.info(f"Lettura del file {file_path}...")
-        
-        # Contatori
-        patterns_created = 0
-        patterns_skipped = 0
-        
-        with open(file_path, 'r', encoding='utf-8') as csvfile:
-            # Leggi l'intestazione per determinare i nomi delle colonne
-            reader = csv.DictReader(csvfile, delimiter=delimiter)
-            
-            # Mostra le colonne trovate
-            logger.info(f"Colonne trovate: {', '.join(reader.fieldnames)}")
-            
-            # Cicla ogni riga del file
-            for row_index, row in enumerate(reader, start=2):  # Start=2 perché la prima riga è l'intestazione
-                try:
-                    # Estrai informazioni di base dal pattern
-                    pattern_id = clean_str(row.get('#', '') or row.get('ID', ''))
-                    title = clean_str(row.get('Pattern', ''))
-                    
-                    if not title:
-                        logger.warning(f"Riga {row_index}: Titolo mancante, salto questa riga")
-                        patterns_skipped += 1
-                        continue
-                    
-                    # Log per debug
-                    logger.info(f"Elaborazione pattern: {title} (ID: {pattern_id})")
-                    
-                    # Verifica se il pattern esiste già
-                    if not dry_run:
-                        existing_pattern = db.query(PrivacyPattern).filter(PrivacyPattern.title == title).first()
-                        if existing_pattern:
-                            logger.warning(f"Pattern '{title}' già esistente, salto")
-                            patterns_skipped += 1
-                            continue
-                    
-                    # Crea dizionario con i dati del pattern
-                    pattern_data = {}
-                    
-                    # Mappatura campi base
-                    for csv_field, model_field in CSV_TO_MODEL_MAPPING.items():
-                        if model_field and csv_field in row:
-                            pattern_data[model_field] = clean_str(row.get(csv_field, ''))
-                    
-                    # Campi mancanti nel mapping
-                    pattern_data["problem"] = "Extracted from description"  # Valore predefinito
-                    pattern_data["solution"] = "See examples for solutions"  # Valore predefinito
-                    
-                    # In modalità dry run, mostra solo i dati che verrebbero inseriti
-                    if dry_run:
-                        logger.info(f"DRY RUN - Pattern da creare: {pattern_data}")
-                        patterns_created += 1
-                        continue
-                    
-                    # Crea nuovo pattern
-                    pattern = PrivacyPattern(
-                        **pattern_data,
-                        created_by_id=admin_id,
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow()
-                    )
-                    
-                    # Aggiungi relazioni se presenti
-                    
-                    # GDPR Articles
-                    gdpr_text = clean_str(row.get('Article GDPR Compliance with the Pattern', ''))
-                    gdpr_refs = split_values(gdpr_text)
-                    for ref in gdpr_refs:
-                        # Estrai il numero dell'articolo (es. "Article 32" -> "32")
-                        article_num = ref.replace("Article", "").strip()
-                        if "�" in article_num:
-                            article_num = article_num.split("�")[0].strip()
-                        
-                        gdpr = db.query(GDPRArticle).filter(GDPRArticle.number == article_num).first()
-                        if gdpr:
-                            pattern.gdpr_articles.append(gdpr)
-                            logger.info(f"  Aggiunto riferimento GDPR: Articolo {article_num}")
-                        else:
-                            logger.warning(f"  Articolo GDPR '{article_num}' non trovato nel database")
-                    
-                    # Privacy by Design
-                    pbd_text = clean_str(row.get('Privacy By Design Principles', ''))
-                    pbd_refs = split_values(pbd_text, delimiter=',')
-                    for ref in pbd_refs:
-                        pbd = db.query(PbDPrinciple).filter(PbDPrinciple.name == ref).first()
-                        if pbd:
-                            pattern.pbd_principles.append(pbd)
-                            logger.info(f"  Aggiunto principio PbD: {ref}")
-                        else:
-                            logger.warning(f"  Principio PbD '{ref}' non trovato nel database")
-                    
-                    # ISO Phases
-                    iso_text = clean_str(row.get('ISO 9241-210 Phase', ''))
-                    iso_refs = split_values(iso_text, delimiter=',')
-                    for ref in iso_refs:
-                        iso = db.query(ISOPhase).filter(ISOPhase.name == ref).first()
-                        if iso:
-                            pattern.iso_phases.append(iso)
-                            logger.info(f"  Aggiunta fase ISO: {ref}")
-                        else:
-                            logger.warning(f"  Fase ISO '{ref}' non trovata nel database")
-                    
-                    # Vulnerabilità (CWE)
-                    vuln_text = clean_str(row.get('CWE Top 25 Most Dangerous Software Weaknesses OWASP Categories Associated', ''))
-                    vuln_refs = split_values(vuln_text, delimiter=',')
-                    for ref in vuln_refs:
-                        # Estrai il codice CWE (es. "CWE-306: ..." -> "CWE-306")
-                        cwe_code = ref.split(':')[0].strip() if ':' in ref else ref
-                        
-                        vuln = db.query(Vulnerability).filter(Vulnerability.cwe_id == cwe_code).first()
-                        if vuln:
-                            pattern.vulnerabilities.append(vuln)
-                            logger.info(f"  Aggiunta vulnerabilità: {cwe_code}")
-                        else:
-                            logger.warning(f"  Vulnerabilità '{cwe_code}' non trovata nel database")
-                    
-                    # Salva nel database
-                    db.add(pattern)
-                    db.commit()
-                    
-                    patterns_created += 1
-                    logger.info(f"Pattern '{title}' importato con successo")
-                    
-                except IntegrityError as e:
-                    db.rollback()
-                    logger.error(f"Errore di integrità alla riga {row_index}: {str(e)}")
-                    patterns_skipped += 1
-                except Exception as e:
-                    db.rollback()
-                    logger.error(f"Errore alla riga {row_index}: {str(e)}")
-                    patterns_skipped += 1
-        
-        logger.info(f"Importazione completata. Patterns creati: {patterns_created}, saltati: {patterns_skipped}")
-        return True
-    
-    except Exception as e:
-        logger.error(f"Errore durante l'importazione: {str(e)}")
-        return False
-    finally:
-        db.close()
+    # Esegui comando alembic
+    alembic.config.main(argv=alembic_args)
 
 if __name__ == "__main__":
-    import argparse
+    main()
+
+1.2. Script di applicazione sicura della migrazione
+"""Script per applicare le migrazioni in modo sicuro."""
+import alembic.config
+import sys
+import os
+import subprocess
+
+def backup_database():
+    """Crea un backup del database prima della migrazione."""
+    result = subprocess.run(
+        ["pg_dump", "-h", "db", "-U", "postgres", "-d", "compliance_compass", "-f", "/tmp/backup_before_migration.sql"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        print(f"Errore nel backup del database: {result.stderr}")
+        return False
+    return True
+
+def main():
+    # Aggiungi la directory root al path
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     
-    parser = argparse.ArgumentParser(description="Importa privacy patterns da CSV al database")
-    parser.add_argument("file_path", help="Percorso del file CSV da importare")
-    parser.add_argument("--admin-id", type=int, default=1, help="ID dell'utente admin (default: 1)")
-    parser.add_argument("--delimiter", default=";", help="Separatore CSV (default: ';')")
-    parser.add_argument("--dry-run", action="store_true", help="Simula l'importazione senza modificare il database")
+    # Backup database
+    if not backup_database():
+        print("Impossibile procedere senza backup")
+        return
+        
+    # Applica migrazioni
+    alembic_args = [
+        '--raiseerr',
+        'upgrade', 
+        'head'
+    ]
     
-    args = parser.parse_args()
+    # Esegui comando alembic
+    try:
+        alembic.config.main(argv=alembic_args)
+        print("Migrazione applicata con successo!")
+    except Exception as e:
+        print(f"Errore durante la migrazione: {str(e)}")
+        print("Consultare il backup in /tmp/backup_before_migration.sql")
+
+if __name__ == "__main__":
+    main()
     
-    logger.info("Avvio importazione...")
+1.3. Verificare ed eseguire la migrazione
+# Generazione della migrazione
+docker-compose exec api python -m scripts.create_migration
+
+# Verifica della migrazione generata
+docker-compose exec api alembic history -v
+
+# Applicazione della migrazione
+docker-compose exec api python -m scripts.apply_migration
+
+
+Fase 2: Ottimizzazione dei Modelli (Giorno 2)
+
+2.1. Revisione e standardizzazione del modello GDPRArticle
+# Parte del file che richiede modifica
+class GDPRArticle(Base):
+    # Altri campi...
     
-    if args.dry_run:
-        logger.info("MODALITÀ DRY RUN: nessuna modifica sarà apportata al database")
-    
-    success = import_csv_data(
-        args.file_path, 
-        admin_id=args.admin_id, 
-        delimiter=args.delimiter,
-        dry_run=args.dry_run
+    # Miglioramento: strategia di caricamento consistente
+    patterns = relationship(
+        "PrivacyPattern", 
+        secondary=pattern_gdpr_association, 
+        back_populates="gdpr_articles", 
+        lazy="selectin"  # Cambiato da "noload" a "selectin" per ottimizzare le query
     )
     
-    if success:
-        logger.info("Importazione completata con successo!")
-        sys.exit(0)
-    else:
-        logger.error("Importazione fallita.")
-        sys.exit(1)
-```
+    # Metodo to_dict migliorato
+    def to_dict(self):
+        """Converte l'oggetto in un dizionario in modo sicuro."""
+        result = {
+            "id": self.id,
+            "number": self.number,
+            "title": self.title,
+            "content": self.content,
+            "summary": self.summary,
+            "category": self.category,
+            "chapter": self.chapter,
+            "is_key_article": self.is_key_article,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+        # Aggiungi relazioni solo se caricate (evita eccezioni)
+        if 'patterns' in self.__dict__:
+            result["patterns"] = [
+                {"id": p.id, "title": p.title} for p in self.patterns
+            ]
+            
+        return result
 
-## Timeline e piano di lavoro
+2.2. Revisione del modello PrivacyPattern
+class PrivacyPattern(Base):
+    # Altri campi...
+    
+    # Assicurati che view_count sia definito correttamente
+    view_count = Column(Integer, nullable=True, default=0)
+    
+    # Strategia di caricamento consistente
+    gdpr_articles = relationship(
+        "GDPRArticle", 
+        secondary=pattern_gdpr_association, 
+        back_populates="patterns",
+        lazy="selectin"  # Strategia di caricamento ottimizzata
+    )
+    
+    # Metodo to_dict migliorato con gestione sicura delle relazioni
+    def to_dict(self):
+        """Converte l'oggetto in un dizionario in modo sicuro."""
+        result = {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "context": self.context,
+            "problem": self.problem,
+            "solution": self.solution,
+            "consequences": self.consequences,
+            "strategy": self.strategy,
+            "mvc_component": self.mvc_component,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by_id": getattr(self, "created_by_id", None),
+            "view_count": getattr(self, "view_count", 0),
+        }
+        
+        # Aggiunta sicura delle relazioni solo se caricate
+        if 'gdpr_articles' in self.__dict__ and self.gdpr_articles:
+            result["gdpr_articles"] = [
+                {"id": g.id, "number": g.number, "title": g.title} 
+                for g in self.gdpr_articles
+            ]
+        else:
+            result["gdpr_articles"] = []
+            
+        # Altre relazioni...
+        
+        return result
 
-**Giorno 1:**
-- Mattina: Analisi del file CSV e adattamento dello script
-- Pomeriggio: Implementazione dello script di importazione
 
-**Giorno 2:**
-- Mattina: Testing dello script con un sottoinsieme di dati
-- Pomeriggio: Ottimizzazione e correzione di eventuali problemi
+Fase 3: Implementazione del Service Layer (Giorno 3)
+3.1. Creazione di servizi centralizzati
+from typing import List, Dict, Any, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+from src.models.gdpr_model import GDPRArticle
+from src.utils.cache import Cache
 
-**Giorno 3:**
-- Mattina: Test completo dell'importazione
-- Pomeriggio: Documentazione e finalizzazione
+# Configurazione del logger
+logger = logging.getLogger(__name__)
 
-## Esecuzione
+# Istanza di cache centralizzata
+cache = Cache()
 
-Per eseguire lo script di importazione:
+class GDPRService:
+    """
+    Servizio centralizzato per operazioni relative agli articoli GDPR.
+    Implementa pattern di resilienza e caching.
+    """
+    
+    @staticmethod
+    @cache.cached(ttl=300)  # Cache per 5 minuti
+    def get_articles(db: Session, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Recupera articoli GDPR con gestione degli errori e caching.
+        """
+        try:
+            articles = db.query(GDPRArticle).order_by(GDPRArticle.number).offset(skip).limit(limit).all()
+            return [article.to_dict() for article in articles]
+        except SQLAlchemyError as e:
+            logger.error(f"Database error in get_articles: {str(e)}")
+            # Implementazione circuit breaker: ritorna dati vuoti in caso di errore
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error in get_articles: {str(e)}")
+            return []
+    
+    @staticmethod
+    @cache.cached(ttl=300)
+    def get_article(db: Session, article_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Recupera un articolo specifico per ID con gestione degli errori.
+        """
+        try:
+            article = db.query(GDPRArticle).filter(GDPRArticle.id == article_id).first()
+            return article.to_dict() if article else None
+        except Exception as e:
+            logger.error(f"Error retrieving article {article_id}: {str(e)}")
+            return None
 
-```bash
-# Copia il file CSV nel container
-docker cp paste-2.txt compliance-compass-api:/app/privacy_patterns.csv
+3.2. Implementazione dell'utilità di cache
+from functools import wraps
+import time
+from typing import Dict, Any, Callable, Tuple, Optional
+import logging
 
-# Esegui lo script in modalità dry-run (simulazione)
-docker-compose exec api python -m scripts.import_privacy_patterns privacy_patterns.csv --dry-run
+logger = logging.getLogger(__name__)
 
-# Esegui l'importazione effettiva
-docker-compose exec api python -m scripts.import_privacy_patterns privacy_patterns.csv
-```
+class Cache:
+    """
+    Implementazione di un sistema di caching in-memory con TTL.
+    """
+    def __init__(self):
+        self._cache: Dict[str, Tuple[Any, float]] = {}
+    
+    def cached(self, ttl: int = 60):
+        """
+        Decorator per cachare i risultati delle funzioni.
+        
+        Args:
+            ttl: Tempo di vita in secondi per la cache
+        """
+        def decorator(func: Callable):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                # Crea una chiave unica basata su funzione e parametri
+                key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+                
+                # Verifica se il valore è in cache e non è scaduto
+                if key in self._cache:
+                    value, timestamp = self._cache[key]
+                    if time.time() - timestamp < ttl:
+                        logger.debug(f"Cache hit for {key}")
+                        return value
+                
+                # Esegui la funzione e salva il risultato in cache
+                logger.debug(f"Cache miss for {key}")
+                result = func(*args, **kwargs)
+                self._cache[key] = (result, time.time())
+                return result
+                
+            return wrapper
+        return decorator
+    
+    def clear(self, pattern: Optional[str] = None):
+        """
+        Pulisce la cache, opzionalmente solo le chiavi che corrispondono a un pattern.
+        """
+        if pattern:
+            self._cache = {k: v for k, v in self._cache.items() if pattern not in k}
+        else:
+            self._cache.clear()
 
-Questo approccio è ideale per il tuo caso d'uso:
-1. Utilizza solo librerie standard Python
-2. Si concentra esclusivamente sulla funzionalità essenziale (CLI)
-3. È facilmente adattabile al formato del tuo CSV
-4. Implementa logging robusto e gestione degli errori
-5. Richiede meno di 3 giorni per l'implementazione completa
 
-Con questo piano, potrai facilmente importare i tuoi privacy patterns nel sistema Compliance Compass e concentrarti sugli aspetti di progettazione per il tuo esame universitario.
+Fase 4: Miglioramento delle API (Giorno 4-5)
+4.1. Controller base con gestione degli errori standardizzata
+from typing import List, Dict, Any, TypeVar, Generic, Type
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+
+# Configurazione del logger
+logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
+
+class BaseController(Generic[T]):
+    """
+    Controller base con implementazione standard delle operazioni CRUD
+    e gestione centralizzata degli errori.
+    """
+    
+    model_class: Type[T] = None
+    
+    @classmethod
+    def get_all(cls, db: Session, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+        """Recupera una lista paginata di record con gestione degli errori."""
+        try:
+            items = db.query(cls.model_class).offset(skip).limit(limit).all()
+            return [item.to_dict() for item in items]
+        except SQLAlchemyError as e:
+            logger.error(f"Database error in {cls.__name__}.get_all: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error in {cls.__name__}.get_all: {str(e)}")
+            return []
+
+4.2. Controller GDPR migliorato
+from typing import List, Optional, Dict, Any
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func
+import logging
+
+from src.models.gdpr_model import GDPRArticle
+from src.controllers.base_controller import BaseController
+from src.services.gdpr_service import GDPRService
+
+# Configurazione del logger
+logger = logging.getLogger(__name__)
+
+class GDPRController(BaseController[GDPRArticle]):
+    """
+    Controller per la gestione degli articoli GDPR.
+    """
+    model_class = GDPRArticle
+    
+    @staticmethod
+    def get_articles(db: Session, skip: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Recupera una lista paginata di articoli GDPR, delegando al service.
+        """
+        return GDPRService.get_articles(db, skip, limit)
+    
+    # Altri metodi migliorati...
+
+4.3. Rotte GDPR con risposta standardizzata
+# Mantenere il codice esistente ma aggiungere:
+
+from src.utils.response_formatter import format_response
+
+@router.get(
+    "/api/gdpr/articles",
+    summary="Lista articoli GDPR", 
+    response_description="Lista paginata di articoli GDPR"
+)
+def get_gdpr_articles(
+    response: Response,
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
+    """Recupera una lista paginata di articoli GDPR con risposta standardizzata."""
+    try:
+        result = GDPRController.get_articles(db, skip=skip, limit=limit)
+        
+        # Formatta la risposta in modo standard
+        return format_response(
+            data={
+                "items": result,
+                "total": len(result),
+                "page": skip // limit + 1 if limit > 0 else 1,
+                "pages": (len(result) + limit - 1) // limit if limit > 0 else 1
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error in get_gdpr_articles: {str(e)}")
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return format_response(error=str(e))
+
+4.4. Utilità di formattazione della risposta
+from typing import Dict, Any, Optional
+
+def format_response(
+    data: Any = None,
+    error: Optional[str] = None,
+    message: str = "Success"
+) -> Dict[str, Any]:
+    """
+    Formatta le risposte API in modo coerente.
+    
+    Args:
+        data: Dati da restituire
+        error: Eventuale messaggio di errore
+        message: Messaggio di successo
+        
+    Returns:
+        Risposta API formattata
+    """
+    response = {
+        "status": "error" if error else "success",
+        "message": error if error else message
+    }
+    
+    if data is not None:
+        response["data"] = data
+        
+    return response
+
+
+Fase 5: Frontend resiliente (Giorno 6-7)
+5.1. Configurazione del servizio API centralizzato
+import axios from 'axios';
+import { toast } from 'react-toastify';
+
+// Istanza axios centralizzata
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor per le richieste
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    console.error('Request error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor per le risposte
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    console.error('API Error:', error);
+    
+    // Gestione comune degli errori
+    if (error.response) {
+      // Gestione errori 401 (già implementata in axios.js)
+      if (error.response.status === 401) {
+        // ...codice esistente per token refresh
+      }
+      
+      // Gestione errori 500
+      else if (error.response.status === 500) {
+        toast.error('Si è verificato un errore nel server. Riprova più tardi.');
+        
+        // Logging avanzato per il debug
+        console.error('Server error details:', error.response.data);
+      }
+    } else if (error.request) {
+      // La richiesta è stata fatta ma non c'è stata risposta
+      toast.error('Impossibile contattare il server.');
+    } else {
+      // Errori nella configurazione della richiesta
+      toast.error('Si è verificato un errore nella richiesta.');
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+
+5.2. Servizio GDPR con resilienza
+import api from './api';
+
+const GDPRService = {
+  /**
+   * Recupera tutti gli articoli GDPR con gestione degli errori
+   * @param {Object} params - Parametri di paginazione
+   * @returns {Promise} - Promise con i dati di risposta o dati vuoti in caso di errore
+   */
+  getArticles: async (params = {}) => {
+    try {
+      const response = await api.get('/gdpr/articles', { params });
+      return response.data.data || { items: [], total: 0 };
+    } catch (error) {
+      console.error('Error fetching GDPR articles:', error);
+      // Ritorna dati vuoti in caso di errore per evitare errori a cascata
+      return { items: [], total: 0 };
+    }
+  },
+  
+  /**
+   * Recupera un articolo specifico per numero
+   * @param {string} number - Numero dell'articolo
+   * @returns {Promise} - Promise con i dati dell'articolo
+   */
+  getArticleByNumber: async (number) => {
+    try {
+      const response = await api.get(`/gdpr/articles/number/${number}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error fetching GDPR article ${number}:`, error);
+      throw error;
+    }
+  }
+};
+
+export default GDPRService;
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import GDPRService from '../../services/gdprService';
+import './GDPRPage.scss';
+
+const GDPRPage = () => {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        setLoading(true);
+        // Usa il servizio centralizzato invece di axios direttamente
+        const data = await GDPRService.getArticles();
+        setArticles(data.items || []);
+        setError(null);
+      } catch (err) {
+        console.error('Errore nel caricamento degli articoli GDPR:', err);
+        setError('Impossibile caricare gli articoli GDPR. Riprova più tardi.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchArticles();
+  }, []);
+
+  // Resto del componente invariato...
+};
+
+export default GDPRPage;
+
+5.3. Componente GDPR migliorato
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import GDPRService from '../../services/gdprService';
+import './GDPRPage.scss';
+
+const GDPRPage = () => {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchArticles = async () => {
+      try {
+        setLoading(true);
+        // Usa il servizio centralizzato invece di axios direttamente
+        const data = await GDPRService.getArticles();
+        setArticles(data.items || []);
+        setError(null);
+      } catch (err) {
+        console.error('Errore nel caricamento degli articoli GDPR:', err);
+        setError('Impossibile caricare gli articoli GDPR. Riprova più tardi.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchArticles();
+  }, []);
+
+  // Resto del componente invariato...
+};
+
+export default GDPRPage;
+
+Fase 6: Monitoraggio e Manutenzione (Giorno 8-10)
+6.1. Endpoint di health centralizzato
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+import psutil
+import time
+import os
+
+from src.db.session import get_db
+
+router = APIRouter(prefix="/monitoring", tags=["monitoraggio"])
+
+@router.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """
+    Verifica completa dello stato del sistema.
+    """
+    start_time = time.time()
+    result = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "components": {}
+    }
+    
+    # Verifica database
+    try:
+        db.execute(text("SELECT 1"))
+        result["components"]["database"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start_time) * 1000, 2)
+        }
+    except Exception as e:
+        result["status"] = "degraded"
+        result["components"]["database"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+    
+    # Verifica filesystem
+    try:
+        disk = psutil.disk_usage(os.path.abspath(os.sep))
+        result["components"]["filesystem"] = {
+            "status": "healthy",
+            "usage_percent": disk.percent,
+            "free_gb": round(disk.free / (1024 ** 3), 2)
+        }
+        
+        if disk.percent > 90:
+            result["components"]["filesystem"]["status"] = "warning"
+            if result["status"] == "healthy":
+                result["status"] = "warning"
+    except Exception as e:
+        result["components"]["filesystem"] = {
+            "status": "error",
+            "error": str(e)
+        }
+    
+    # Metriche di sistema
+    result["system"] = {
+        "cpu_percent": psutil.cpu_percent(),
+        "memory_percent": psutil.virtual_memory().percent,
+        "response_time_ms": round((time.time() - start_time) * 1000, 2)
+    }
+    
+    return result
+
+6.2. Script di verifica integrità database
+"""
+Script per verificare l'integrità del database e correggere eventuali problemi.
+"""
+import sys
+import os
+import traceback
+from sqlalchemy import MetaData, inspect, text
+
+# Aggiungi la directory root al sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.db.session import SessionLocal, engine
+from src.models.gdpr_model import GDPRArticle
+from src.models.privacy_pattern import PrivacyPattern
+
+def check_table_exists(inspector, table_name):
+    """Verifica se una tabella esiste."""
+    return table_name in inspector.get_table_names()
+
+def check_column_exists(inspector, table_name, column_name):
+    """Verifica se una colonna esiste in una tabella."""
+    columns = [col['name'] for col in inspector.get_columns(table_name)]
+    return column_name in columns
+
+def main():
+    try:
+        db = SessionLocal()
+        inspector = inspect(engine)
+        
+        print("=== Verifica integrità database ===")
+        
+        # Verifica tabelle principali
+        for table_name in ["gdpr_articles", "privacy_patterns", "users"]:
+            exists = check_table_exists(inspector, table_name)
+            print(f"Tabella {table_name}: {'OK' if exists else 'MANCANTE'}")
+            
+        # Verifica colonna view_count in privacy_patterns
+        if check_table_exists(inspector, "privacy_patterns"):
+            has_view_count = check_column_exists(inspector, "privacy_patterns", "view_count")
+            print(f"Colonna view_count in privacy_patterns: {'OK' if has_view_count else 'MANCANTE'}")
+            
+            # Aggiungi colonna se mancante
+            if not has_view_count:
+                print("Aggiunta della colonna view_count...")
+                db.execute(text("ALTER TABLE privacy_patterns ADD COLUMN view_count INTEGER DEFAULT 0"))
+                db.commit()
+                print("Colonna view_count aggiunta correttamente.")
+        
+        # Verifica record nelle tabelle principali
+        gdpr_count = db.query(GDPRArticle).count()
+        pattern_count = db.query(PrivacyPattern).count()
+        
+        print(f"Articoli GDPR nel database: {gdpr_count}")
+        print(f"Privacy Patterns nel database: {pattern_count}")
+        
+        print("\n=== Verifica completata ===")
+        
+    except Exception as e:
+        print(f"Errore durante la verifica: {str(e)}")
+        traceback.print_exc()
+    finally:
+        if 'db' in locals():
+            db.close()
+
+if __name__ == "__main__":
+    main()
+
+6.3. Aggiornamento del script di startup
+# Aggiungi all'avvio dell'applicazione
+
+@app.on_event("startup")
+async def startup_checks():
+    """Esegue controlli all'avvio dell'applicazione."""
+    try:
+        # Verifica connessione DB
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+            logger.info("Database connection: OK")
+        
+        # Registro i router per il monitoraggio
+        from src.routes import monitoring_routes
+        app.include_router(monitoring_routes.router, prefix="/api")
+        
+        logger.info("Application startup checks completed successfully.")
+    except Exception as e:
+        logger.error(f"Startup check failed: {str(e)}")
+        
+Sequenza di Implementazione
+Giorni 1-2: Allineamento del database e ottimizzazione modelli
+
+Generare migrazione per view_count
+Ottimizzare le relazioni nei modelli
+Implementare metodi to_dict più robusti
+Giorni 3-4: Service layer e base controller
+
+Implementare il service pattern per la logica di business
+Creare un controller base con gestione errori standardizzata
+Aggiungere caching e resilienza
+Giorni 5-6: Miglioramento API e frontend
+
+Aggiornare le rotte con risposte standardizzate
+Implementare servizi centralizzati nel frontend
+Migliorare la gestione degli errori nelle API
+Giorni 7-8: Testing e validazione
+
+Testare tutte le API con vari scenari di errore
+Verificare la resilienza del frontend
+Testare l'integrazione end-to-end
+Giorni 9-10: Monitoraggio e documentazione
+
+Implementare endpoint di health check
+Aggiungere script di verifica dell'integrità del database
+Documentare l'architettura e le best practice
+Vantaggi della Soluzione
+Risoluzione permanente dei problemi di disallineamento tra modelli e schema database
+Resilienza a livello di API e frontend contro errori futuri
+Performance migliorata attraverso strategie di caching e caricamento ottimizzate
+Manutenibilità grazie alla standardizzazione dei pattern
+Monitoraggio proattivo per identificare problemi prima che causino errori visibili agli utenti
+Questo piano di sviluppo affronta non solo i sintomi (errori 500) ma anche le cause radice, garantendo una soluzione duratura che migliorerà la stabilità e le prestazioni dell'intera applicazione ComplianceCompass.

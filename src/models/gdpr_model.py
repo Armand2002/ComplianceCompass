@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from src.models.base import Base
 from src.models.privacy_pattern import pattern_gdpr_association
 
@@ -23,11 +23,16 @@ class GDPRArticle(Base):
     category = Column(String(100), index=True)  # Categorie degli articoli GDPR, ad esempio "Principi" (principles) o "Diritti" (rights) definiti nel regolamento.
     chapter = Column(String(100), index=True)  # es. "Capitolo II", "Capitolo III"
     is_key_article = Column(Boolean, default=False, index=True)  # Indicates whether the article is particularly important. Key articles are those that have significant implications for compliance or are frequently referenced in privacy patterns.
-    created_at = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
-    # Relazioni
-    patterns = relationship("PrivacyPattern", secondary=pattern_gdpr_association, back_populates="gdpr_articles", lazy="joined")
+    # Relazioni ottimizzate
+    patterns = relationship(
+        "PrivacyPattern", 
+        secondary=pattern_gdpr_association, 
+        back_populates="gdpr_articles", 
+        lazy="selectin"  # Cambiato da "noload" a "selectin" per ottimizzare le query
+    )
     
     def __repr__(self):
         return f"<GDPRArticle(id={self.id}, number='{self.number}', title='{self.title}')>"
@@ -80,12 +85,24 @@ class GDPRArticle(Base):
         return query.all()
     
     def to_dict(self):
-        """Converte l'oggetto in un dizionario."""
-        return {
+        """Converte l'oggetto in un dizionario in modo sicuro."""
+        result = {
             "id": self.id,
             "number": self.number,
             "title": self.title,
-            "description": self.description,
+            "content": self.content,
+            "summary": self.summary,
+            "category": self.category,
+            "chapter": self.chapter,
+            "is_key_article": self.is_key_article,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
+        
+        # Aggiungi relazioni solo se caricate (evita eccezioni)
+        if 'patterns' in self.__dict__:
+            result["patterns"] = [
+                {"id": p.id, "title": p.title} for p in self.patterns
+            ]
+            
+        return result

@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { PatternProvider } from './context/PatternContext';
-import { ToastProvider } from './components/common/Toast';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Layouts
 import MainLayout from './components/layout/MainLayout';
@@ -38,42 +39,41 @@ const App = () => {
   return (
     <AuthProvider>
       <PatternProvider>
-        <ToastProvider>
-          <Router>
-            <Routes>
-              <Route element={<MainLayout />}>
-                {/* Rotte pubbliche */}
-                <Route path="/" element={<HomePage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/patterns" element={<PatternListPage />} />
-                <Route path="/patterns/:id" element={<PatternDetailPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/gdpr" element={<GDPRPage />} />
-                <Route path="/privacy-by-design" element={<PrivacyByDesignPage />} />
-                
-                {/* Rotte newsletter (pubbliche) */}
-                <Route path="/newsletter/verify" element={<NewsletterVerification />} />
-                <Route path="/newsletter/manage" element={<ManageSubscription />} />
-                
-                {/* Rotte di autenticazione */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                
-                {/* Rotte protette */}
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/patterns/create" element={<PatternCreatePage />} />
-                  <Route path="/patterns/:id/edit" element={<PatternEditPage />} />
-                  <Route path="/chatbot" element={<ChatbotPage />} />
-                  <Route path="/profile" element={<UserProfilePage />} />
-                </Route>
-                
-                <Route path="*" element={<NotFoundPage />} />
+        <Router>
+          <Routes>
+            <Route element={<MainLayout />}>
+              {/* Rotte pubbliche */}
+              <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/patterns" element={<PatternListPage />} />
+              <Route path="/patterns/:id" element={<PatternDetailPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/gdpr" element={<GDPRPage />} />
+              <Route path="/privacy-by-design" element={<PrivacyByDesignPage />} />
+              
+              {/* Rotte newsletter (pubbliche) */}
+              <Route path="/newsletter/verify" element={<NewsletterVerification />} />
+              <Route path="/newsletter/manage" element={<ManageSubscription />} />
+              
+              {/* Rotte di autenticazione */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              
+              {/* Rotte protette */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/patterns/create" element={<PatternCreatePage />} />
+                <Route path="/patterns/:id/edit" element={<PatternEditPage />} />
+                <Route path="/chatbot" element={<ChatbotPage />} />
+                <Route path="/profile" element={<UserProfilePage />} />
               </Route>
-            </Routes>
-          </Router>
-        </ToastProvider>
+              
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </Router>
+        <ToastContainer position="top-right" autoClose={5000} />
       </PatternProvider>
     </AuthProvider>
   );

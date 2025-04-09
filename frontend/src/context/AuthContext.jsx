@@ -1,8 +1,11 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import AuthService from '../api/authService';
 
 // Creazione del contesto
 export const AuthContext = createContext();
+
+// Crea un hook personalizzato per usare il contesto
+export const useAuth = () => useContext(AuthContext);
 
 /**
  * Provider per il contesto di autenticazione

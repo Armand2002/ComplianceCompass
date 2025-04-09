@@ -1,33 +1,14 @@
-import React, { useContext } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext'; // Importa solo il contesto
 
-/**
- * Componente per le rotte protette
- * Reindirizza al login se l'utente non è autenticato
- */
+// Modifica da useAuth a useContext(AuthContext)
 const ProtectedRoute = () => {
-  const { isAuthenticated, isLoading } = useContext(AuthContext);
-  const location = useLocation();
-
-  // Mostra un loader durante il controllo dell'autenticazione
-  if (isLoading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Caricamento...</p>
-      </div>
-    );
-  }
-
-  // Reindirizza al login se l'utente non è autenticato
-  if (!isAuthenticated) {
-    // Salva l'URL corrente per reindirizzare l'utente dopo il login
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // Renderizza le route figlie tramite Outlet
-  return <Outlet />;
+  // Usa React.useContext invece di useAuth
+  const auth = React.useContext(AuthContext);
+  
+  // Verifica isAuthenticated dal contesto
+  return auth.isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
 export default ProtectedRoute;

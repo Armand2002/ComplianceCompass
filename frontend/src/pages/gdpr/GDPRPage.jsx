@@ -1,7 +1,7 @@
 // frontend/src/pages/gdpr/GDPRPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import GDPRService from '../../services/gdprService';
 import './GDPRPage.scss';
 
 const GDPRPage = () => {
@@ -14,8 +14,9 @@ const GDPRPage = () => {
     const fetchArticles = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/gdpr/articles');
-        setArticles(response.data.items || []);
+        // Usa il servizio centralizzato invece di axios direttamente
+        const data = await GDPRService.getArticles();
+        setArticles(data.items || []);
         setError(null);
       } catch (err) {
         console.error('Errore nel caricamento degli articoli GDPR:', err);
@@ -28,8 +29,8 @@ const GDPRPage = () => {
     fetchArticles();
   }, []);
 
-  const handleArticleClick = (articleId) => {
-    navigate(`/gdpr/articles/${articleId}`);
+  const handleArticleClick = (number) => {
+    navigate(`/gdpr/articles/${number}`);
   };
 
   return (
@@ -64,27 +65,27 @@ const GDPRPage = () => {
         <div className="gdpr-articles-container">
           <h2>Articoli GDPR</h2>
           <div className="gdpr-articles-grid">
-            {articles.map((article) => (
-              <div 
-                key={article.id} 
-                className="gdpr-article-card"
-                onClick={() => handleArticleClick(article.number)}
-              >
-                <h3>Articolo {article.number}</h3>
-                <h4>{article.title}</h4>
-                <p>{article.summary}</p>
-                <div className="card-footer">
-                  <span className="category">{article.category}</span>
+            {articles.length > 0 ? (
+              articles.map((article) => (
+                <div 
+                  key={article.id} 
+                  className="gdpr-article-card"
+                  onClick={() => handleArticleClick(article.number)}
+                >
+                  <h3>Articolo {article.number}</h3>
+                  <h4>{article.title}</h4>
+                  <p>{article.summary}</p>
+                  <div className="card-footer">
+                    <span className="category">{article.category}</span>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="empty-state">
+                <p>Nessun articolo GDPR disponibile al momento.</p>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
-
-      {!loading && !error && articles.length === 0 && (
-        <div className="empty-state">
-          <p>Nessun articolo GDPR disponibile al momento.</p>
         </div>
       )}
     </div>

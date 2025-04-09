@@ -36,3 +36,6 @@ httpx==0.24.1
 
 # Rate limiting
 slowapi==0.1.8
+
+# Monitoring e Logging
+psutil==5.9.0
